@@ -1551,23 +1551,14 @@ def download_folder_zip():
         else:
             zip_filename = f"{get_website_name_for_backup()}.zip"
         
-        # Set proper headers for download
-        from flask import Response
-        
-        zip_buffer.seek(0, 2)  # Seek to end to get size
-        zip_size = zip_buffer.tell()
-        zip_buffer.seek(0)  # Reset to beginning
-        
-        response = Response(
-            zip_buffer.getvalue(),
+        # Reset pointer and stream the file
+        zip_buffer.seek(0)
+        return send_file(
+            zip_buffer,
             mimetype='application/zip',
-            headers={
-                'Content-Disposition': f'attachment; filename="{zip_filename}"',
-                'Content-Length': str(zip_size),
-                'Content-Type': 'application/zip'
-            }
+            as_attachment=True,
+            download_name=zip_filename
         )
-        return response
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
