@@ -275,32 +275,15 @@ def process_html_for_preview(html_content, file_path):
         if not url or not url.strip():
             return match.group(0)
         
-        # Check if this is a local file with domain structure (like Wayback-Archive does)
-        # Paths like /fonts.googleapis.com/css-abc123.css are LOCAL files, not external URLs
-        # They should be served through preview-assets
-        # ALWAYS check for local files first before treating as external
-        local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
-        for domain_path in local_domain_paths:
-            if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
-                # Check if this file exists locally
-                test_path = url.lstrip('/')
-                test_full_path = safe_path(test_path)
-                if test_full_path and os.path.exists(test_full_path):
-                    # This is a local file - resolve it properly
-                    resolved = resolve_relative_path(file_path, url)
-                    new_url = f'/preview-assets/{resolved}'.replace('//', '/')
-                    if not quote1 and not quote2:
-                        quote1 = quote2 = '"'
-                    return f'{attr_name}={quote1}{new_url}{quote2}'
-        
         # For ANY absolute path starting with /, check if it's a local file first
+        # This MUST come first to catch ALL absolute paths including domain-structured ones
         if url.startswith('/'):
             test_path = url.lstrip('/')
             test_full_path = safe_path(test_path)
             if test_full_path and os.path.exists(test_full_path):
-                # This is a local file - convert to preview-assets
-                resolved = resolve_relative_path(file_path, url)
-                new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                # This is a local file - use the path directly (absolute paths are already from root)
+                # Just prepend /preview-assets/ to the path
+                new_url = f'/preview-assets/{test_path}'.replace('//', '/')
                 if not quote1 and not quote2:
                     quote1 = quote2 = '"'
                 return f'{attr_name}={quote1}{new_url}{quote2}'
@@ -399,7 +382,8 @@ def process_html_for_preview(html_content, file_path):
     
     # Fix all href, src, action, background, poster, etc.
     # Handle both quoted and unquoted attributes (common in minified HTML)
-    attributes_pattern = r'\b(href|src|action|background|poster|data-src|data-background|data-bg)\s*=\s*(["\']?)([^\s>"\']+)(["\']?)'
+    # Improved pattern to handle quoted and unquoted attributes more reliably
+    attributes_pattern = r'\b(href|src|action|background|poster|data-src|data-background|data-bg)\s*=\s*(["\'"]?)([^"\'"<>]*?)(["\'"]?)(?=[\s>])'
     html_content = re.sub(attributes_pattern, fix_url_attribute, html_content, flags=re.IGNORECASE)
     
     # Fix style attributes (for inline styles with url())
@@ -425,29 +409,15 @@ def process_html_for_preview(html_content, file_path):
             if not url:
                 return m.group(0)
             
-            # Check if this is a local file with domain structure (like Wayback-Archive)
-            local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
-            for domain_path in local_domain_paths:
-                if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
-                    # Check if file exists locally
-                    test_path = url.lstrip('/')
-                    test_full_path = safe_path(test_path)
-                    if test_full_path and os.path.exists(test_full_path):
-                        # This is a local file - resolve it properly
-                        resolved = resolve_relative_path(file_path, url)
-                        new_url = f'/preview-assets/{resolved}'.replace('//', '/')
-                        return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
-            
             # For ANY absolute path starting with /, check if it's a local file first
             # This ensures images, fonts, and other assets in paths like /images/logo.png
-            # or /templates/fonts/fontawesome.woff2 are correctly identified as local
+            # or /templates/fonts/fontawesome.woff2 or /fonts.googleapis.com/css-xxx.css are correctly identified
             if url.startswith('/'):
                 test_path = url.lstrip('/')
                 test_full_path = safe_path(test_path)
                 if test_full_path and os.path.exists(test_full_path):
-                    # This is a local file - convert to preview-assets
-                    resolved = resolve_relative_path(file_path, url)
-                    new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                    # This is a local file - use the path directly (absolute paths are already from root)
+                    new_url = f'/preview-assets/{test_path}'.replace('//', '/')
                     return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
             
             # For external CDNs (if not local), preserve them
@@ -484,25 +454,13 @@ def process_html_for_preview(html_content, file_path):
                 if not url:
                     return match.group(0)
                 
-                # Check for local files with domain structure
-                local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
-                for domain_path in local_domain_paths:
-                    if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
-                        test_path = url.lstrip('/')
-                        test_full_path = safe_path(test_path)
-                        if test_full_path and os.path.exists(test_full_path):
-                            resolved = resolve_relative_path(file_path, url)
-                            new_url = f'/preview-assets/{resolved}'.replace('//', '/')
-                            return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
-                
                 # For ANY absolute path starting with /, check if it's a local file first
                 if url.startswith('/'):
                     test_path = url.lstrip('/')
                     test_full_path = safe_path(test_path)
                     if test_full_path and os.path.exists(test_full_path):
-                        # This is a local file - convert to preview-assets
-                        resolved = resolve_relative_path(file_path, url)
-                        new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                        # This is a local file - use the path directly (absolute paths are already from root)
+                        new_url = f'/preview-assets/{test_path}'.replace('//', '/')
                         return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
                 
                 # Resolve path for local files
@@ -647,6 +605,104 @@ def preview_assets(asset_path):
     # Set appropriate MIME types for common web assets
     if full_path.endswith('.css'):
         mimetype = 'text/css; charset=utf-8'
+        # Process CSS files to rewrite url() functions for fonts, images, etc.
+        try:
+            with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
+                css_content = f.read()
+            
+            # Process CSS content similar to how we process HTML
+            def fix_css_url_in_file(match):
+                prefix = match.group(1)
+                quote1 = match.group(2) or ''
+                url = match.group(3)
+                quote2 = match.group(4) or ''
+                suffix = match.group(5)
+                
+                # Skip external URLs, data URIs
+                if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+                    return match.group(0)
+                
+                if not url:
+                    return match.group(0)
+                
+                # For ANY absolute path starting with /, check if it's a local file
+                if url.startswith('/'):
+                    test_path = url.lstrip('/')
+                    test_full_path = safe_path(test_path)
+                    if test_full_path and os.path.exists(test_full_path):
+                        # Use the path directly (absolute paths are already from root)
+                        new_url = f'/preview-assets/{test_path}'.replace('//', '/')
+                        return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+                
+                # For relative paths, resolve relative to the CSS file location
+                if not url.startswith('/'):
+                    css_dir = '/'.join(asset_path.split('/')[:-1]) if '/' in asset_path else ''
+                    resolved = resolve_relative_path(asset_path, url)
+                    new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                    return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+                
+                return match.group(0)
+            
+            # Fix all url() references in CSS
+            css_url_pattern = r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))'
+            css_content = re.sub(css_url_pattern, fix_css_url_in_file, css_content, flags=re.IGNORECASE)
+            
+            # Also fix @font-face src declarations
+            def fix_font_face_in_css(m):
+                font_face_content = m.group(1)
+                def fix_src_url_in_css(match):
+                    prefix = match.group(1)
+                    url_part = match.group(2)
+                    quote1 = match.group(3) or ''
+                    url = match.group(4)
+                    quote2 = match.group(5) or ''
+                    suffix = match.group(6)
+                    
+                    if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+                        return match.group(0)
+                    
+                    if not url:
+                        return match.group(0)
+                    
+                    if url.startswith('/'):
+                        test_path = url.lstrip('/')
+                        test_full_path = safe_path(test_path)
+                        if test_full_path and os.path.exists(test_full_path):
+                            new_url = f'/preview-assets/{test_path}'.replace('//', '/')
+                            return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
+                    
+                    if not url.startswith('/'):
+                        resolved = resolve_relative_path(asset_path, url)
+                        new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                        return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
+                    
+                    return match.group(0)
+                
+                font_face_content = re.sub(
+                    r'(src\s*:\s*)(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
+                    fix_src_url_in_css,
+                    font_face_content,
+                    flags=re.IGNORECASE
+                )
+                font_face_content = re.sub(
+                    r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
+                    fix_css_url_in_file,
+                    font_face_content,
+                    flags=re.IGNORECASE
+                )
+                return f'@font-face{{{font_face_content}}}'
+            
+            css_content = re.sub(
+                r'@font-face\s*\{([^}]+)\}',
+                fix_font_face_in_css,
+                css_content,
+                flags=re.IGNORECASE | re.DOTALL
+            )
+            
+            return css_content, 200, {'Content-Type': mimetype}
+        except Exception as e:
+            # If processing fails, serve original file
+            pass
     elif full_path.endswith('.js'):
         mimetype = 'application/javascript; charset=utf-8'
     elif full_path.endswith('.json'):

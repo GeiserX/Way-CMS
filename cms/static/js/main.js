@@ -101,19 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initResizablePanes();
 });
 
-// Re-initialize when preview is toggled
-const originalTogglePreview = window.togglePreview;
-window.togglePreview = function() {
-    if (originalTogglePreview) originalTogglePreview();
-    setTimeout(() => {
-        setupEditorPreviewResize();
-        const handle = document.getElementById('editor-preview-resize-handle');
-        const previewPane = document.querySelector('.preview-pane');
-        if (handle && previewPane) {
-            handle.style.display = previewPane.style.display === 'none' ? 'none' : 'block';
-        }
-    }, 100);
-};
+// Note: togglePreview is defined later in the file
 
 // File browser navigation
 function navigateTo(path) {
