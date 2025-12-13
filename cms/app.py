@@ -281,6 +281,14 @@ def process_html_for_preview(html_content, file_path):
         if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
             return match.group(0)
         
+        # Allow external font services and CDNs (preserve domain structure)
+        external_services = [
+            'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com',
+            'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
+        ]
+        if any(service in url for service in external_services):
+            return match.group(0)
+        
         if not url:
             return match.group(0)
         
