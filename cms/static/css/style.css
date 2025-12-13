@@ -482,13 +482,27 @@ body {
     position: relative;
 }
 
-.file-item .btn, .dir-item .btn {
+.file-item .btn, .dir-item .btn,
+.file-item .context-menu-btn, .dir-item .context-menu-btn {
     opacity: 0;
     transition: opacity 0.2s;
 }
 
-.file-item:hover .btn, .dir-item:hover .btn {
+.file-item:hover .btn, .dir-item:hover .btn,
+.file-item:hover .context-menu-btn, .dir-item:hover .context-menu-btn {
     opacity: 1;
+}
+
+/* File size display */
+.file-size {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
+    display: none;
+}
+
+.show-file-sizes .file-size {
+    display: inline;
 }
 
 .modal-body .form-group {

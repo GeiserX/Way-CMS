@@ -60,7 +60,7 @@
         background: #007acc;
     }
     .preview-pane::before {
-        content: 'Live Preview';
+        content: attr(data-preview-title);
         position: absolute;
         top: 0;
         left: 0;
@@ -74,6 +74,119 @@
         letter-spacing: 1px;
         z-index: 10;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    /* Header menu dropdown */
+    .menu-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .menu-dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: 100%;
+        background: var(--bg-secondary);
+        min-width: 200px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        z-index: 1000;
+        margin-top: 0.25rem;
+        overflow: hidden;
+    }
+    .menu-dropdown-content.show {
+        display: block;
+    }
+    .menu-dropdown-content a {
+        color: var(--text-primary);
+        padding: 0.75rem 1rem;
+        text-decoration: none;
+        display: block;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .menu-dropdown-content a:hover {
+        background: var(--bg-tertiary);
+    }
+    .menu-divider {
+        height: 1px;
+        background: var(--border-color);
+        margin: 0.25rem 0;
+    }
+    /* Three-dot context menu for files */
+    .context-menu-btn {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        font-size: 1rem;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+    .context-menu-btn:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+    .context-menu {
+        position: absolute;
+        right: 0;
+        top: 100%;
+        background: var(--bg-secondary);
+        min-width: 150px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        z-index: 1000;
+        display: none;
+        overflow: hidden;
+    }
+    .context-menu.show {
+        display: block;
+    }
+    .context-menu a {
+        color: var(--text-primary);
+        padding: 0.5rem 0.75rem;
+        text-decoration: none;
+        display: block;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: background 0.2s;
+    }
+    .context-menu a:hover {
+        background: var(--bg-tertiary);
+    }
+    .context-menu a.danger {
+        color: #f44336;
+    }
+    .context-menu a.danger:hover {
+        background: rgba(244, 67, 54, 0.1);
+    }
+    /* File size hidden by default */
+    .file-size {
+        display: none;
+    }
+    .show-file-sizes .file-size {
+        display: inline;
+    }
+    /* Folder tree styles */
+    .folder-contents {
+        margin-left: 1.25rem;
+        border-left: 1px solid var(--border-color);
+        display: none;
+    }
+    .folder-contents.expanded {
+        display: block;
+    }
+    .dir-item .folder-toggle {
+        cursor: pointer;
+        transition: transform 0.2s;
+        display: inline-block;
+        width: 16px;
+        text-align: center;
+    }
+    .dir-item.expanded .folder-toggle {
+        transform: rotate(90deg);
     }
     .preview-iframe {
         width: 100%;
@@ -135,18 +248,30 @@
 <header class="header">
     <h1 class="logo-title">Way-CMS</h1>
     <div class="header-actions">
-        <button class="btn btn-secondary" onclick="downloadCurrentFolder()">📦 Download ZIP</button>
-        <button class="btn btn-secondary" onclick="showUploadZipDialog()">📤 Upload ZIP</button>
-        <button class="btn btn-secondary" onclick="showUploadFileDialog()">📁 Upload File</button>
+        <!-- Primary visible buttons -->
         <button class="btn btn-secondary" onclick="toggleSearch()">🔍 Search</button>
-        <button class="btn btn-secondary" onclick="toggleGlobalReplace()">🔄 Find & Replace</button>
+        <button class="btn btn-secondary" onclick="toggleGlobalReplace()">🔄 Replace</button>
         <button class="btn btn-secondary" onclick="toggleBackups()">💾 Backups</button>
-        <button class="btn btn-secondary" onclick="toggleTheme()" id="theme-toggle" title="Toggle Dark/Light Theme">🌓 Theme</button>
-        <button class="btn btn-secondary" onclick="showKeyboardShortcuts()" title="Keyboard Shortcuts">⌨️ Shortcuts</button>
-        <button class="btn btn-secondary" onclick="exportSettings()" title="Export Settings">📤 Export</button>
-        <button class="btn btn-secondary" onclick="importSettings()" title="Import Settings">📥 Import</button>
         <button class="btn btn-secondary" onclick="refreshFiles()">🔄 Refresh</button>
-        <a href="{{ url_for('logout') }}" class="btn btn-secondary">🚪 Logout</a>
+        
+        <!-- Hamburger menu for overflow items -->
+        <div class="menu-dropdown">
+            <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu()" id="header-menu-toggle">☰ More</button>
+            <div class="menu-dropdown-content" id="header-menu-dropdown">
+                <a onclick="downloadCurrentFolder(); closeHeaderMenu();">📦 Download ZIP</a>
+                <a onclick="showUploadZipDialog(); closeHeaderMenu();">📤 Upload ZIP</a>
+                <a onclick="showUploadFileDialog(); closeHeaderMenu();">📁 Upload File</a>
+                <div class="menu-divider"></div>
+                <a onclick="toggleFileSizeDisplay(); closeHeaderMenu();" id="toggle-filesize-btn">📏 Show File Sizes</a>
+                <a onclick="toggleTheme(); closeHeaderMenu();" id="theme-menu-btn">🌓 Toggle Theme</a>
+                <div class="menu-divider"></div>
+                <a onclick="showKeyboardShortcuts(); closeHeaderMenu();">⌨️ Keyboard Shortcuts</a>
+                <a onclick="exportSettings(); closeHeaderMenu();">📤 Export Settings</a>
+                <a onclick="importSettings(); closeHeaderMenu();">📥 Import Settings</a>
+                <div class="menu-divider"></div>
+                <a href="{{ url_for('logout') }}">🚪 Logout</a>
+            </div>
+        </div>
     </div>
 </header>
 

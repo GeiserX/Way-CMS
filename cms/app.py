@@ -1349,6 +1349,32 @@ def download_folder_zip():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/download-file')
+@login_required
+def download_single_file():
+    """Download a single file."""
+    path = request.args.get('path', '')
+    full_path = safe_path(path)
+    
+    if not full_path:
+        return jsonify({'error': 'Invalid path'}), 400
+    
+    if not os.path.exists(full_path):
+        return jsonify({'error': 'File not found'}), 404
+    
+    if not os.path.isfile(full_path):
+        return jsonify({'error': 'Path is not a file'}), 400
+    
+    try:
+        return send_file(
+            full_path,
+            as_attachment=True,
+            download_name=os.path.basename(full_path)
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/upload-zip', methods=['POST'])
 @login_required
 @read_only_check

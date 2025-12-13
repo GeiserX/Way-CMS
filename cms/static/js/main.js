@@ -7,6 +7,128 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+// File size display toggle
+let showFileSizes = localStorage.getItem('waycms_show_filesizes') === 'true';
+
+function toggleFileSizeDisplay() {
+    showFileSizes = !showFileSizes;
+    localStorage.setItem('waycms_show_filesizes', showFileSizes);
+    updateFileSizeDisplay();
+    updateFileSizeToggleButton();
+}
+
+function updateFileSizeDisplay() {
+    const fileList = document.getElementById('fileList');
+    if (fileList) {
+        fileList.classList.toggle('show-file-sizes', showFileSizes);
+    }
+}
+
+function updateFileSizeToggleButton() {
+    const btn = document.getElementById('toggle-filesize-btn');
+    if (btn) {
+        btn.textContent = showFileSizes ? '📏 Hide File Sizes' : '📏 Show File Sizes';
+    }
+}
+
+// Header menu dropdown
+function toggleHeaderMenu() {
+    const dropdown = document.getElementById('header-menu-dropdown');
+    dropdown.classList.toggle('show');
+}
+
+function closeHeaderMenu() {
+    const dropdown = document.getElementById('header-menu-dropdown');
+    dropdown.classList.remove('show');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.menu-dropdown')) {
+        closeHeaderMenu();
+    }
+    // Also close any open context menus
+    document.querySelectorAll('.context-menu.show').forEach(menu => {
+        if (!e.target.closest('.context-menu-wrapper')) {
+            menu.classList.remove('show');
+        }
+    });
+});
+
+// Context menu for files/folders
+function showContextMenu(e, path, isDirectory) {
+    e.stopPropagation();
+    // Close all other context menus first
+    document.querySelectorAll('.context-menu.show').forEach(menu => {
+        menu.classList.remove('show');
+    });
+    
+    const menu = e.target.closest('.context-menu-wrapper').querySelector('.context-menu');
+    menu.classList.toggle('show');
+}
+
+function hideContextMenu(menuId) {
+    const menu = document.getElementById(menuId);
+    if (menu) {
+        menu.classList.remove('show');
+    }
+}
+
+// Delete file/folder with confirmation
+function deleteItem(path, isDirectory) {
+    const itemType = isDirectory ? 'folder' : 'file';
+    const confirmMsg = isDirectory 
+        ? `⚠️ Are you sure you want to delete the folder "${path}" and ALL its contents?\n\nThis action cannot be undone!`
+        : `Are you sure you want to delete "${path}"?\n\nThis action cannot be undone.`;
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    fetch(`${API_BASE}/api/file?path=${encodeURIComponent(path)}`, {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error deleting ' + itemType + ': ' + data.error);
+        } else {
+            showToast(itemType.charAt(0).toUpperCase() + itemType.slice(1) + ' deleted');
+            if (currentFilePath === path) {
+                closeEditor();
+            }
+            loadFiles(currentPath);
+        }
+    })
+    .catch(err => {
+        alert('Error deleting ' + itemType + ': ' + err.message);
+    });
+}
+
+// Copy path to clipboard
+function copyPath(path) {
+    navigator.clipboard.writeText(path).then(() => {
+        showToast('Path copied to clipboard');
+    }).catch(err => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = path;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('Path copied to clipboard');
+    });
+}
+
+// Download single file
+function downloadFile(path) {
+    window.location.href = `${API_BASE}/api/download-file?path=${encodeURIComponent(path)}`;
+}
+
+// Expanded folders cache
+let expandedFolders = new Set();
+
 // File statistics display
 function updateFileStats() {
     if (!currentEditor) return;
@@ -75,26 +197,60 @@ function useSearchHistory(query) {
     }
 }
 
-// File filtering
+// File filtering - searches recursively including in subfolders
 function filterFiles(pattern) {
     const fileList = document.getElementById('fileList');
     if (!fileList) return;
     
-    const items = fileList.querySelectorAll('.file-item, .dir-item');
     const filterLower = pattern.toLowerCase().trim();
     
-    items.forEach(item => {
-        const nameEl = item.querySelector('.file-name') || item.querySelector('span:nth-child(2)');
-        if (!nameEl) return;
+    // Get all items including those in expanded folders
+    const allItems = fileList.querySelectorAll('.file-item, .dir-item');
+    const allFolderContents = fileList.querySelectorAll('.folder-contents');
+    
+    if (!filterLower) {
+        // Show all items when filter is empty
+        allItems.forEach(item => item.classList.remove('hidden'));
+        allFolderContents.forEach(fc => {
+            if (expandedFolders.has(fc.id.replace('folder-', '').replace(/_/g, '/'))) {
+                fc.classList.add('expanded');
+            }
+        });
+        return;
+    }
+    
+    allItems.forEach(item => {
+        // Get the full path for searching
+        const path = item.dataset.path || '';
+        const nameEl = item.querySelector('.file-name') || item.querySelector('.dir-name');
+        const name = nameEl ? nameEl.textContent.toLowerCase() : '';
+        const fullPath = path.toLowerCase();
         
-        const name = nameEl.textContent.toLowerCase();
+        let matches = false;
         
         // Handle glob patterns like *.html
         if (filterLower.includes('*')) {
-            const regex = new RegExp('^' + filterLower.replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
-            item.classList.toggle('hidden', !regex.test(name));
+            const regex = new RegExp('^' + filterLower.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
+            matches = regex.test(name) || regex.test(fullPath);
         } else {
-            item.classList.toggle('hidden', !name.includes(filterLower));
+            matches = name.includes(filterLower) || fullPath.includes(filterLower);
+        }
+        
+        item.classList.toggle('hidden', !matches);
+        
+        // For directories, if they match or have matching children, show them
+        if (item.classList.contains('dir-item') && !matches) {
+            // Check if any child matches - expand folders that might have matches
+            const containerId = 'folder-' + path.replace(/[^a-zA-Z0-9]/g, '_');
+            const container = document.getElementById(containerId);
+            if (container) {
+                const hasVisibleChildren = container.querySelector('.file-item:not(.hidden), .dir-item:not(.hidden)');
+                if (hasVisibleChildren) {
+                    item.classList.remove('hidden');
+                    container.classList.add('expanded');
+                    item.classList.add('expanded');
+                }
+            }
         }
     });
 }
@@ -397,53 +553,128 @@ function updateBreadcrumb(path) {
     });
 }
 
-function loadFiles(path) {
-    const fileListEl = document.getElementById('fileList');
-    fileListEl.innerHTML = '<div class="loading">Loading files...</div>';
+function loadFiles(path, targetEl = null) {
+    const fileListEl = targetEl || document.getElementById('fileList');
+    if (!targetEl) {
+        fileListEl.innerHTML = '<div class="loading">Loading files...</div>';
+    }
     
     fetch(`${API_BASE}/api/files?path=${encodeURIComponent(path)}`)
         .then(res => res.json())
         .then(data => {
-            fileListEl.innerHTML = '';
+            if (!targetEl) {
+                fileListEl.innerHTML = '';
+            }
             
-            // Add directories
+            // Add directories with expandable tree
             data.directories.forEach(dir => {
+                const menuId = 'ctx-' + dir.path.replace(/[^a-zA-Z0-9]/g, '_');
+                const isExpanded = expandedFolders.has(dir.path);
                 const item = document.createElement('div');
-                item.className = 'dir-item';
+                item.className = 'dir-item' + (isExpanded ? ' expanded' : '');
+                item.dataset.path = dir.path;
                 item.innerHTML = `
+                    <span class="folder-toggle" onclick="event.stopPropagation(); toggleFolder('${dir.path.replace(/'/g, "\\'")}', this)">▶</span>
                     <span class="dir-icon">📁</span>
-                    <span style="flex: 1;">${escapeHtml(dir.name)}</span>
-                    <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); showRenameDialog('${dir.path.replace(/'/g, "\\'")}', true)">Rename</button>
+                    <span class="dir-name" style="flex: 1;">${escapeHtml(dir.name)}</span>
+                    <div class="context-menu-wrapper" style="position: relative;">
+                        <button class="context-menu-btn" onclick="event.stopPropagation(); showContextMenu(event, '${dir.path.replace(/'/g, "\\'")}', true)">⋮</button>
+                        <div class="context-menu" id="${menuId}">
+                            <a onclick="event.stopPropagation(); showRenameDialog('${dir.path.replace(/'/g, "\\'")}', true); hideContextMenu('${menuId}');">✏️ Rename</a>
+                            <a onclick="event.stopPropagation(); copyPath('${dir.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">📋 Copy Path</a>
+                            <a class="danger" onclick="event.stopPropagation(); deleteItem('${dir.path.replace(/'/g, "\\'")}', true); hideContextMenu('${menuId}');">🗑️ Delete</a>
+                        </div>
+                    </div>
                 `;
-                item.onclick = () => navigateTo(dir.path);
+                item.onclick = (e) => {
+                    if (!e.target.closest('.context-menu-wrapper') && !e.target.classList.contains('folder-toggle')) {
+                        toggleFolder(dir.path, item.querySelector('.folder-toggle'));
+                    }
+                };
                 fileListEl.appendChild(item);
+                
+                // Add container for folder contents
+                const folderContents = document.createElement('div');
+                folderContents.className = 'folder-contents' + (isExpanded ? ' expanded' : '');
+                folderContents.id = 'folder-' + dir.path.replace(/[^a-zA-Z0-9]/g, '_');
+                fileListEl.appendChild(folderContents);
+                
+                // Load expanded folders
+                if (isExpanded) {
+                    loadFiles(dir.path, folderContents);
+                }
             });
             
-            // Add files
+            // Add files with three-dot menu
             data.files.forEach(file => {
+                const menuId = 'ctx-' + file.path.replace(/[^a-zA-Z0-9]/g, '_');
                 const item = document.createElement('div');
                 item.className = 'file-item';
+                item.dataset.path = file.path;
                 const fileIcon = getFileIcon(file.name);
                 const isImage = /\.(jpg|jpeg|png|gif|svg|webp|ico)$/i.test(file.name);
                 const fileSize = formatFileSize(file.size || 0);
                 item.innerHTML = `
                     <span class="file-icon">${fileIcon}</span>
                     <span class="file-name" style="flex: 1;">${escapeHtml(file.name)}</span>
-                    <span class="file-size" style="color: var(--text-secondary); font-size: 0.75rem; margin-right: 0.5rem;">${fileSize}</span>
-                    ${isImage ? `<button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-right: 0.25rem;" onclick="event.stopPropagation(); previewImage('${file.path.replace(/'/g, "\\'")}')" title="Preview Image">👁️</button>` : ''}
-                    <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); showRenameDialog('${file.path.replace(/'/g, "\\'")}', false)">Rename</button>
+                    <span class="file-size">${fileSize}</span>
+                    <div class="context-menu-wrapper" style="position: relative;">
+                        <button class="context-menu-btn" onclick="event.stopPropagation(); showContextMenu(event, '${file.path.replace(/'/g, "\\'")}', false)">⋮</button>
+                        <div class="context-menu" id="${menuId}">
+                            <a onclick="event.stopPropagation(); showRenameDialog('${file.path.replace(/'/g, "\\'")}', false); hideContextMenu('${menuId}');">✏️ Rename</a>
+                            <a onclick="event.stopPropagation(); copyPath('${file.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">📋 Copy Path</a>
+                            ${isImage ? `<a onclick="event.stopPropagation(); previewImage('${file.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">👁️ Preview</a>` : ''}
+                            <a onclick="event.stopPropagation(); downloadFile('${file.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">⬇️ Download</a>
+                            <a class="danger" onclick="event.stopPropagation(); deleteItem('${file.path.replace(/'/g, "\\'")}', false); hideContextMenu('${menuId}');">🗑️ Delete</a>
+                        </div>
+                    </div>
                 `;
-                item.onclick = () => openFile(file.path);
+                item.onclick = (e) => {
+                    if (!e.target.closest('.context-menu-wrapper')) {
+                        openFile(file.path);
+                    }
+                };
                 fileListEl.appendChild(item);
             });
             
             if (data.directories.length === 0 && data.files.length === 0) {
-                fileListEl.innerHTML = '<div class="loading">No files found</div>';
+                if (!targetEl) {
+                    fileListEl.innerHTML = '<div class="loading">No files found</div>';
+                }
             }
+            
+            // Apply file size display setting
+            updateFileSizeDisplay();
         })
         .catch(err => {
             fileListEl.innerHTML = `<div class="loading" style="color: #f44336;">Error: ${err.message}</div>`;
         });
+}
+
+// Toggle folder expansion
+function toggleFolder(path, toggleEl) {
+    const containerId = 'folder-' + path.replace(/[^a-zA-Z0-9]/g, '_');
+    const container = document.getElementById(containerId);
+    const dirItem = toggleEl.closest('.dir-item');
+    
+    if (!container) return;
+    
+    const isExpanded = container.classList.contains('expanded');
+    
+    if (isExpanded) {
+        // Collapse
+        container.classList.remove('expanded');
+        dirItem.classList.remove('expanded');
+        expandedFolders.delete(path);
+        container.innerHTML = '';
+    } else {
+        // Expand
+        container.classList.add('expanded');
+        dirItem.classList.add('expanded');
+        expandedFolders.add(path);
+        container.innerHTML = '<div class="loading" style="padding: 0.5rem; font-size: 0.8rem;">Loading...</div>';
+        loadFiles(path, container);
+    }
 }
 
 function openFile(path) {
@@ -472,12 +703,13 @@ function openFile(path) {
             }
             
             // Create editor container with preview option
+            const fileName = path.split('/').pop();
             container.innerHTML = `
                 <div class="editor-with-preview" id="editor-wrapper">
                     <div class="editor-pane">
                         <textarea id="editor"></textarea>
                     </div>
-                    <div class="preview-pane" id="preview-pane" style="display: ${isHtml && previewEnabled ? 'block' : 'none'};">
+                    <div class="preview-pane" id="preview-pane" data-preview-title="Preview: ${escapeHtml(fileName)}" style="display: ${isHtml && previewEnabled ? 'block' : 'none'};">
                         <iframe class="preview-iframe" id="preview-iframe" srcdoc=""></iframe>
                     </div>
                 </div>
@@ -1315,6 +1547,10 @@ function uploadZipFile() {
 document.addEventListener('DOMContentLoaded', () => {
     navigateTo('');
     
+    // Initialize file size display setting
+    updateFileSizeDisplay();
+    updateFileSizeToggleButton();
+    
     // Handle Enter key in search
     document.getElementById('search-query').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -1344,6 +1580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     modal.style.display = 'none';
                 }
             });
+            closeHeaderMenu();
         }
     });
 });
