@@ -151,30 +151,90 @@ body {
     min-width: 0;
     justify-content: flex-end;
     align-items: center;
-    overflow: visible;
+    overflow: visible; /* allow dropdown to escape */
 }
 
-.zip-action {
+.header-actions-main {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden; /* hide overflowing buttons, move them into More */
+    flex: 1;
+}
+
+.header-action-btn {
+    white-space: nowrap;
     flex-shrink: 0;
 }
 
-.header-btn {
-    flex-shrink: 1;
-    transition: opacity 0.2s, visibility 0.2s;
-    white-space: nowrap;
+.header-action-btn.is-overflowed {
+    display: none !important;
 }
 
-.header-btn.hidden {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    width: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
+.header-overflow {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10050;
 }
 
 .menu-dropdown {
     flex-shrink: 0;
+}
+
+.menu-toggle {
+    white-space: nowrap;
+}
+
+.menu-dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    background: var(--bg-secondary);
+    min-width: 220px;
+    max-width: 360px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    z-index: 10060;
+    overflow: hidden;
+}
+
+.menu-dropdown-content.show {
+    display: block;
+}
+
+.menu-dropdown-content a {
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    display: block;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1.1rem;
+    transition: background 0.15s ease;
+}
+
+.menu-dropdown-content a:hover {
+    background: var(--bg-tertiary);
+}
+
+.menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.25rem 0;
+}
+
+/* Make header degrade nicely on narrow widths */
+@media (max-width: 900px) {
+    .header {
+        padding: 0.75rem 1rem;
+    }
+    .header .logo-title {
+        font-size: 1.5rem;
+    }
 }
 
 /* Main Layout */

@@ -38,6 +38,7 @@ function toggleHeaderMenu(e) {
         e.stopPropagation();
     }
     const dropdown = document.getElementById('header-menu-dropdown');
+    const toggleBtn = document.getElementById('header-menu-toggle');
     if (dropdown) {
         const isShowing = dropdown.classList.contains('show');
         // Close all other dropdowns first
@@ -45,8 +46,12 @@ function toggleHeaderMenu(e) {
             menu.classList.remove('show');
         });
         // Toggle this one
-        if (!isShowing) {
+        if (isShowing) {
+            dropdown.classList.remove('show');
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+        } else {
             dropdown.classList.add('show');
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
         }
     }
 }
@@ -55,6 +60,59 @@ function closeHeaderMenu() {
     const dropdown = document.getElementById('header-menu-dropdown');
     if (dropdown) {
         dropdown.classList.remove('show');
+    }
+    const toggleBtn = document.getElementById('header-menu-toggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+}
+
+// Header overflow toolbar (move buttons into "More" when space is limited)
+function buildOverflowMenuItemForButton(btn) {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = btn.getAttribute('data-overflow-label') || btn.textContent || 'Action';
+    a.setAttribute('role', 'menuitem');
+    a.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeHeaderMenu();
+        // Trigger the original button action
+        btn.click();
+    });
+    return a;
+}
+
+function syncHeaderOverflow() {
+    const main = document.getElementById('header-actions-main');
+    const overflowList = document.getElementById('header-menu-overflow-items');
+    const overflowDivider = document.getElementById('header-menu-overflow-divider');
+    if (!main || !overflowList) return;
+
+    // Reset overflow state
+    overflowList.innerHTML = '';
+    if (overflowDivider) overflowDivider.style.display = 'none';
+
+    const overflowableButtons = Array.from(main.querySelectorAll('.header-action-btn.is-overflowable'));
+    overflowableButtons.forEach((btn) => btn.classList.remove('is-overflowed'));
+
+    // Force layout settle
+    void main.offsetWidth;
+
+    // Move buttons from right to left into overflow until it fits
+    let safety = 0;
+    while (main.scrollWidth > main.clientWidth && safety < 50) {
+        // Find last visible overflowable button
+        const candidates = overflowableButtons.filter((b) => !b.classList.contains('is-overflowed'));
+        const btn = candidates[candidates.length - 1];
+        if (!btn) break;
+
+        btn.classList.add('is-overflowed');
+        // Prepend so the menu keeps original left-to-right order visually
+        overflowList.prepend(buildOverflowMenuItemForButton(btn));
+        safety += 1;
+    }
+
+    if (overflowDivider) {
+        overflowDivider.style.display = overflowList.children.length ? 'block' : 'none';
     }
 }
 
@@ -2001,103 +2059,13 @@ function closeKeyboardShortcuts() {
     document.getElementById('keyboard-shortcuts-modal').style.display = 'none';
 }
 
-// Dynamic header button visibility based on window width
-function updateHeaderButtonVisibility() {
-    const header = document.querySelector('.header');
-    const logoContainer = header ? header.querySelector('div:first-child') : null;
-    const headerActions = document.querySelector('.header-actions');
-    const menuDropdown = document.querySelector('.menu-dropdown');
-    
-    if (!header || !logoContainer || !headerActions) {
-        console.warn('Header elements not found');
-        return;
-    }
-    
-    // Get all header buttons
-    const buttons = Array.from(headerActions.querySelectorAll('.header-btn'));
-    const zipButtons = Array.from(headerActions.querySelectorAll('.zip-action'));
-    
-    if (buttons.length === 0 && zipButtons.length === 0) {
-        console.warn('No buttons found');
-        return;
-    }
-    
-    // Reset all buttons to visible first to get accurate measurements
-    buttons.forEach(btn => {
-        btn.classList.remove('hidden');
-    });
-    
-    // Force a reflow to get accurate measurements
-    void header.offsetHeight;
-    
-    // Get dimensions
-    const headerRect = header.getBoundingClientRect();
-    const logoRect = logoContainer.getBoundingClientRect();
-    const menuRect = menuDropdown ? menuDropdown.getBoundingClientRect() : { width: 80 };
-    
-    // Calculate available space for buttons
-    const horizontalPadding = 48; // Total padding (left + right)
-    const gap = 8; // Gap between buttons
-    const logoWidth = logoRect.width;
-    const menuWidth = menuRect.width;
-    const minSpacing = gap * 3; // Minimum spacing
-    const availableWidth = headerRect.width - logoWidth - menuWidth - horizontalPadding - minSpacing;
-    
-    // Measure button widths (must measure while visible)
-    const buttonData = [];
-    let totalNeededWidth = 0;
-    
-    // Add ZIP buttons first (always visible)
-    zipButtons.forEach(btn => {
-        const rect = btn.getBoundingClientRect();
-        const width = rect.width || btn.offsetWidth || 120; // Fallback width
-        buttonData.push({ btn, width, alwaysVisible: true });
-        totalNeededWidth += width + gap;
-    });
-    
-    // Add regular buttons
-    buttons.forEach(btn => {
-        const rect = btn.getBoundingClientRect();
-        const width = rect.width || btn.offsetWidth || 100; // Fallback width
-        buttonData.push({ btn, width, alwaysVisible: false });
-        totalNeededWidth += width + gap;
-    });
-    
-    // If buttons don't fit, hide from right to left (but keep ZIP buttons visible)
-    if (totalNeededWidth > availableWidth) {
-        // Calculate width of always-visible buttons (ZIP buttons + menu)
-        let usedWidth = buttonData
-            .filter(item => item.alwaysVisible)
-            .reduce((sum, item) => sum + item.width + gap, 0);
-        
-        // Now try to fit as many regular buttons as possible from left to right
-        for (let i = zipButtons.length; i < buttonData.length; i++) {
-            const { btn, width } = buttonData[i];
-            const buttonWidthWithGap = width + gap;
-            
-            if (usedWidth + buttonWidthWithGap <= availableWidth) {
-                // Button fits, keep it visible
-                usedWidth += buttonWidthWithGap;
-            } else {
-                // Button doesn't fit, hide it and all remaining buttons
-                for (let j = i; j < buttonData.length; j++) {
-                    if (!buttonData[j].alwaysVisible) {
-                        buttonData[j].btn.classList.add('hidden');
-                    }
-                }
-                break;
-            }
-        }
-    }
-}
-
 // Initialize theme on load
 document.addEventListener('DOMContentLoaded', () => {
     loadTheme();
     
-    // Update button visibility on load - wait a bit for layout to settle
+    // Build header overflow menu on load (wait for layout)
     setTimeout(() => {
-        updateHeaderButtonVisibility();
+        syncHeaderOverflow();
     }, 100);
     
     // Update on window resize with debounce
@@ -2105,7 +2073,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
-            updateHeaderButtonVisibility();
+            syncHeaderOverflow();
         }, 100);
     });
     
@@ -2114,15 +2082,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (header && window.ResizeObserver) {
         const resizeObserver = new ResizeObserver(() => {
             // Small delay to ensure layout has settled
-            setTimeout(updateHeaderButtonVisibility, 100);
+            setTimeout(syncHeaderOverflow, 100);
         });
         resizeObserver.observe(header);
         
-        // Also observe the header-actions container
-        const headerActions = document.querySelector('.header-actions');
-        if (headerActions) {
-            resizeObserver.observe(headerActions);
-        }
+        const headerMain = document.getElementById('header-actions-main');
+        if (headerMain) resizeObserver.observe(headerMain);
     }
     
     // Global keyboard shortcuts

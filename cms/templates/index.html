@@ -75,73 +75,7 @@
         z-index: 10;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    /* Header responsive design */
-    .header {
-        min-height: 60px;
-        flex-wrap: nowrap;
-    }
-    .header > div:first-child {
-        flex-shrink: 0;
-        white-space: nowrap;
-        min-width: fit-content;
-    }
-    .header-actions {
-        flex: 1;
-        min-width: 0;
-        justify-content: flex-end;
-        overflow: hidden;
-    }
-    .zip-action {
-        flex-shrink: 0;
-    }
-    .header-btn {
-        flex-shrink: 1;
-        transition: opacity 0.2s, visibility 0.2s;
-    }
-    .header-btn.hidden {
-        display: none !important;
-    }
-    /* Header menu dropdown */
-    .menu-dropdown {
-        position: relative;
-        display: inline-block;
-        flex-shrink: 0;
-        z-index: 10001;
-    }
-    .menu-dropdown-content {
-        display: none;
-        position: absolute;
-        right: 0;
-        top: calc(100% + 0.25rem);
-        background: var(--bg-secondary);
-        min-width: 200px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        z-index: 10000;
-        overflow: hidden;
-    }
-    .menu-dropdown-content.show {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-    .menu-dropdown-content a {
-        color: var(--text-primary);
-        padding: 0.75rem 1rem;
-        text-decoration: none;
-        display: block;
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-    .menu-dropdown-content a:hover {
-        background: var(--bg-tertiary);
-    }
-    .menu-divider {
-        height: 1px;
-        background: var(--border-color);
-        margin: 0.25rem 0;
-    }
+    /* Header styles live in static/css/style.css */
     /* Three-dot context menu for files */
     .context-menu-btn {
         background: none;
@@ -347,31 +281,35 @@
         </a>
         {% endif %}
     </div>
-    <div class="header-actions">
-        <!-- ZIP Export/Import buttons - always visible on the left -->
-        <button class="btn btn-primary zip-action" onclick="downloadCurrentFolder()" data-button-id="zip-export">📦 ZIP Export</button>
-        <button class="btn btn-primary zip-action" onclick="showUploadZipDialog()" data-button-id="zip-import">📤 ZIP Import</button>
-        
-        <!-- Other primary buttons - will be hidden dynamically if space is limited -->
-        <button class="btn btn-secondary header-btn" onclick="toggleSearch()" data-button-id="search">🔍 Search</button>
-        <button class="btn btn-secondary header-btn" onclick="toggleGlobalReplace()" data-button-id="replace">🔄 Replace</button>
-        <button class="btn btn-secondary header-btn" onclick="toggleBackups()" data-button-id="backups">💾 Backups</button>
-        <button class="btn btn-secondary header-btn" onclick="refreshFiles()" data-button-id="refresh">🔄 Refresh</button>
-        
-        <!-- Hamburger menu for overflow items -->
-        <div class="menu-dropdown">
-            <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu(event)" id="header-menu-toggle">☰ More</button>
-            <div class="menu-dropdown-content" id="header-menu-dropdown">
-                <a onclick="showUploadFileDialog(); closeHeaderMenu();">📁 Upload File</a>
+    <div class="header-actions" id="header-actions">
+        <div class="header-actions-main" id="header-actions-main">
+            <!-- Pinned buttons (always visible) -->
+            <button class="btn btn-primary header-action-btn is-pinned" onclick="downloadCurrentFolder()" data-overflow-key="zip-export" data-overflow-label="📦 ZIP Export">📦 ZIP Export</button>
+            <button class="btn btn-primary header-action-btn is-pinned" onclick="showUploadZipDialog()" data-overflow-key="zip-import" data-overflow-label="📤 ZIP Import">📤 ZIP Import</button>
+
+            <!-- Overflowable buttons (auto-moved into More when needed) -->
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleSearch()" data-overflow-key="search" data-overflow-label="🔍 Search">🔍 Search</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleGlobalReplace()" data-overflow-key="replace" data-overflow-label="🔄 Replace">🔄 Replace</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleBackups()" data-overflow-key="backups" data-overflow-label="💾 Backups">💾 Backups</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="refreshFiles()" data-overflow-key="refresh" data-overflow-label="🔄 Refresh">🔄 Refresh</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showUploadFileDialog()" data-overflow-key="upload-file" data-overflow-label="📁 Upload File">📁 Upload File</button>
+        </div>
+
+        <div class="menu-dropdown header-overflow" id="header-overflow">
+            <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu(event)" id="header-menu-toggle" aria-haspopup="true" aria-expanded="false">☰ More</button>
+            <div class="menu-dropdown-content" id="header-menu-dropdown" role="menu" aria-labelledby="header-menu-toggle">
+                <div id="header-menu-overflow-items"></div>
+                <div class="menu-divider" id="header-menu-overflow-divider" style="display:none;"></div>
+
+                <!-- Always-available items -->
+                <a onclick="toggleFileSizeDisplay(); closeHeaderMenu();" id="toggle-filesize-btn" role="menuitem">📏 Show File Sizes</a>
+                <a onclick="toggleTheme(); closeHeaderMenu();" id="theme-menu-btn" role="menuitem">🌓 Toggle Theme</a>
                 <div class="menu-divider"></div>
-                <a onclick="toggleFileSizeDisplay(); closeHeaderMenu();" id="toggle-filesize-btn">📏 Show File Sizes</a>
-                <a onclick="toggleTheme(); closeHeaderMenu();" id="theme-menu-btn">🌓 Toggle Theme</a>
+                <a onclick="showKeyboardShortcuts(); closeHeaderMenu();" role="menuitem">⌨️ Keyboard Shortcuts</a>
+                <a onclick="exportSettings(); closeHeaderMenu();" role="menuitem">📤 Export Settings</a>
+                <a onclick="importSettings(); closeHeaderMenu();" role="menuitem">📥 Import Settings</a>
                 <div class="menu-divider"></div>
-                <a onclick="showKeyboardShortcuts(); closeHeaderMenu();">⌨️ Keyboard Shortcuts</a>
-                <a onclick="exportSettings(); closeHeaderMenu();">📤 Export Settings</a>
-                <a onclick="importSettings(); closeHeaderMenu();">📥 Import Settings</a>
-                <div class="menu-divider"></div>
-                <a href="{{ url_for('logout') }}">🚪 Logout</a>
+                <a href="{{ url_for('logout') }}" role="menuitem">🚪 Logout</a>
             </div>
         </div>
     </div>
