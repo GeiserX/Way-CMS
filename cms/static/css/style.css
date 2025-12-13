@@ -147,17 +147,21 @@ body {
     width: 320px;
     min-width: 200px;
     max-width: 50%;
-    background: linear-gradient(180deg, #252526 0%, #1e1e1e 100%);
-    border-right: 2px solid #3e3e42;
+    background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-primary) 100%);
+    border-right: 2px solid var(--border-color);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 2px 0 8px rgba(0,0,0,0.2);
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] .sidebar {
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
 }
 
 .sidebar-resize-handle {
     width: 5px;
-    background: #3e3e42;
+    background: var(--border-color);
     cursor: col-resize;
     flex-shrink: 0;
     position: relative;
@@ -176,12 +180,13 @@ body {
 
 .breadcrumb {
     padding: 0.75rem 1rem;
-    background: #1e1e1e;
-    border-bottom: 2px solid #3e3e42;
+    background: var(--bg-primary);
+    border-bottom: 2px solid var(--border-color);
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     font-size: 0.875rem;
+    color: var(--text-primary);
 }
 
 .breadcrumb-item {
@@ -196,7 +201,7 @@ body {
 
 .breadcrumb-item:not(:last-child)::after {
     content: ' / ';
-    color: #666;
+    color: var(--text-secondary);
     margin-left: 0.5rem;
 }
 
@@ -217,9 +222,14 @@ body {
 }
 
 .file-item:hover, .dir-item:hover {
-    background: linear-gradient(90deg, #2a2d2e 0%, #3e3e42 100%);
+    background: linear-gradient(90deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
     transform: translateX(2px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] .file-item:hover, 
+[data-theme="light"] .dir-item:hover {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .file-item.active {
@@ -246,7 +256,7 @@ body {
 .loading {
     padding: 1rem;
     text-align: center;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 /* Editor Area */
@@ -254,18 +264,22 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #1e1e1e;
+    background: var(--bg-primary);
     overflow: hidden;
 }
 
 .editor-toolbar {
-    background: linear-gradient(135deg, #2d2d2d 0%, #252526 100%);
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
     padding: 0.875rem 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 2px solid #3e3e42;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border-bottom: 2px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] .editor-toolbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .file-info {
@@ -275,12 +289,12 @@ body {
 }
 
 .file-info span {
-    color: #d4d4d4;
+    color: var(--text-primary);
 }
 
 .status {
     font-size: 0.875rem;
-    color: #999;
+    color: var(--text-secondary);
 }
 
 .status.saved {
@@ -308,11 +322,11 @@ body {
 
 .welcome-message h2 {
     margin-bottom: 1rem;
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .welcome-message p {
-    color: #999;
+    color: var(--text-secondary);
     margin-bottom: 0.5rem;
 }
 
@@ -342,14 +356,19 @@ body {
 }
 
 .btn-secondary {
-    background: linear-gradient(135deg, #3e3e42 0%, #2a2d2e 100%);
-    color: #d4d4d4;
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
-    background: linear-gradient(135deg, #505052 0%, #3e3e42 100%);
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+[data-theme="light"] .btn-secondary:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
 .btn-danger {
@@ -378,7 +397,7 @@ body {
 }
 
 .modal-content {
-    background: linear-gradient(135deg, #252526 0%, #1e1e1e 100%);
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-primary) 100%);
     border-radius: 12px;
     width: 90%;
     max-width: 800px;
@@ -386,31 +405,36 @@ body {
     display: flex;
     flex-direction: column;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-    border: 1px solid #3e3e42;
+    border: 1px solid var(--border-color);
 }
 
 .modal-header {
     padding: 1rem;
-    border-bottom: 1px solid #3e3e42;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
 .modal-header h2 {
-    color: #fff;
+    color: var(--text-primary);
     font-size: 1.25rem;
 }
 
 .close-btn {
     background: none;
     border: none;
-    color: #d4d4d4;
+    color: var(--text-primary);
     font-size: 1.5rem;
     cursor: pointer;
     padding: 0;
     width: 30px;
     height: 30px;
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: var(--accent-color);
 }
 
 .modal-body {
@@ -424,12 +448,12 @@ body {
 
 .search-result-item {
     padding: 0.75rem;
-    border-bottom: 1px solid #3e3e42;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
 }
 
 .search-result-item:hover {
-    background: #2a2d2e;
+    background: var(--bg-tertiary);
 }
 
 .search-result-item .file-path {
@@ -439,13 +463,13 @@ body {
 }
 
 .search-result-item .match-line {
-    color: #999;
+    color: var(--text-secondary);
     font-size: 0.875rem;
     margin-left: 1rem;
 }
 
 .match-line .line-number {
-    color: #666;
+    color: var(--text-secondary);
     margin-right: 0.5rem;
 }
 
@@ -456,23 +480,23 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #424242;
+    background: var(--border-color);
     border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #4e4e4e;
+    background: var(--bg-tertiary);
 }
 
 /* Additional styles for new features */
 .file-browser-actions {
     padding: 0.75rem;
-    border-bottom: 2px solid #3e3e42;
-    background: #1e1e1e;
+    border-bottom: 2px solid var(--border-color);
+    background: var(--bg-primary);
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
