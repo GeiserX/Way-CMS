@@ -1,7 +1,7 @@
 # Way-CMS
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/GeiserX/Way-CMS/main/cms/static/images/way-cms-logo.png" alt="Way-CMS Logo" width="350">
+  <img src="cms/static/images/way-cms-logo.png" alt="Way-CMS Logo" width="350">
 </div>
 
 A simple, web-accessible CMS for editing HTML/CSS files downloaded from Wayback Archive. This tool allows you to self-service edit your archived website files through a modern web interface with real-time preview.
