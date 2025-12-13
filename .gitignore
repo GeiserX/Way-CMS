@@ -47,3 +47,4 @@ website/
 
 # Temporary files
 *.tmp
+.way-cms-backups/
