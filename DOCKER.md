@@ -33,7 +33,7 @@ Way-CMS can be deployed using Docker Compose with two services:
    ```
 
 4. **Access the services:**
-   - **Public Website**: http://localhost (port 80)
+   - **Public Website**: http://localhost:8080 (port 8080)
    - **CMS Admin**: http://localhost:5000 (port 5000)
 
 ## Configuration
@@ -52,7 +52,7 @@ Way-CMS can be deployed using Docker Compose with two services:
 
 ### Ports
 
-- `80` - Public website (nginx)
+- `8080` - Public website (nginx, mapped from container port 80)
 - `5000` - CMS admin interface
 
 ## Updating Website Files
@@ -99,7 +99,7 @@ For production:
        ssl_certificate_key /path/to/key.pem;
        
        location / {
-           proxy_pass http://way-cms-website:80;
+           proxy_pass http://way-cms-website:80;  # Container internal port
        }
    }
    

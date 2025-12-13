@@ -246,8 +246,12 @@ def process_html_for_preview(html_content, file_path):
         if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', '#', 'mailto:', 'tel:', 'blob:')):
             return match.group(0)
         
-        # Allow external font services to load
-        if 'fonts.googleapis.com' in url or 'fonts.gstatic.com' in url or 'cdnjs.cloudflare.com' in url:
+        # Allow external font services and CDNs to load (preserve domain structure like Wayback-Archive)
+        external_services = [
+            'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com',
+            'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
+        ]
+        if any(service in url for service in external_services):
             return match.group(0)
         
         # Skip empty URLs
