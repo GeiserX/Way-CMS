@@ -116,7 +116,12 @@ function openFile(path) {
                 const iframe = document.getElementById('preview-iframe');
                 if (iframe) {
                     // Use the preview endpoint which processes the file correctly
-                    iframe.src = `/preview/${encodeURIComponent(path)}`;
+                    // This will load with all assets properly resolved
+                    const previewUrl = `/preview/${encodeURIComponent(path)}`;
+                    iframe.src = previewUrl;
+                    
+                    // Also update preview when content changes
+                    // This is already handled by updatePreview() on editor changes
                 }
             }
             

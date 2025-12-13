@@ -229,10 +229,10 @@ def process_html_for_preview(html_content, file_path):
             return match.group(0)
         
         # Skip empty URLs
-        if not url:
+        if not url.strip():
             return match.group(0)
         
-        # Resolve relative path
+        # Resolve relative path - handles both absolute (/) and relative paths
         resolved = resolve_relative_path(file_path, url)
         new_url = f'/preview-assets/{resolved}'.replace('//', '/')
         
