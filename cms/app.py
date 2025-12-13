@@ -474,17 +474,33 @@ def process_html_for_preview(html_content, file_path):
     # Match style tags - including multiline content
     html_content = re.sub(r'<style([^>]*)>((?:[^<]|<(?!/style>))*?)</style>', fix_style_tag, html_content, flags=re.IGNORECASE | re.DOTALL)
     
-    # Inject base tag for additional compatibility
-    base_url = f'/preview-assets/{file_dir}/' if file_dir else '/preview-assets/'
-    base_url = base_url.replace('//', '/')
+    # For iframe srcdoc to work properly, we need absolute URLs or a proper base tag
+    # Get the current request host to make absolute URLs
+    from flask import request
+    try:
+        base_host = request.host_url.rstrip('/')
+    except RuntimeError:
+        # Outside request context - use relative
+        base_host = ''
+    
+    # Inject base tag with absolute URL for better compatibility with srcdoc
+    base_url = f'{base_host}/preview-assets/{file_dir}/' if file_dir else f'{base_host}/preview-assets/'
+    base_url = base_url.replace('//', '/').replace(':/', '://')  # Fix double slashes but preserve protocol
     base_tag = f'<base href="{base_url}">'
     
-    # Inject base tag if not present
-    if not re.search(r'<base[^>]*>', html_content, re.IGNORECASE):
+    # Inject base tag if not present - ALWAYS inject/update for proper asset resolution
+    if re.search(r'<base[^>]*>', html_content, re.IGNORECASE):
+        # Replace existing base tag
+        html_content = re.sub(r'<base[^>]*>', base_tag, html_content, flags=re.IGNORECASE, count=1)
+    else:
+        # Inject new base tag
         if re.search(r'<head[^>]*>', html_content, re.IGNORECASE):
             html_content = re.sub(r'(<head[^>]*>)', f'\\1\n    {base_tag}', html_content, flags=re.IGNORECASE, count=1)
         elif re.search(r'<html', html_content, re.IGNORECASE):
             html_content = re.sub(r'(<html[^>]*>)', f'\\1\n<head>{base_tag}</head>', html_content, flags=re.IGNORECASE, count=1)
+        else:
+            # No HTML structure - wrap it
+            html_content = f'<html><head>{base_tag}</head><body>{html_content}</body></html>'
     
     return html_content
 
