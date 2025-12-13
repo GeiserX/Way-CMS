@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Public website served via nginx
   website:
