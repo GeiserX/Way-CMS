@@ -268,11 +268,24 @@ def process_html_for_preview(html_content, file_path):
         quote2 = match.group(4) or ''     # Closing quote (can be empty for unquoted)
         
         # Skip external URLs, data URIs, javascript, anchors, etc.
-        if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', '#', 'mailto:', 'tel:', 'blob:')):
+        if url.startswith(('http://', 'https://', 'data:', 'javascript:', '#', 'mailto:', 'tel:', 'blob:')):
             return match.group(0)
         
         # Skip empty URLs
         if not url or not url.strip():
+            return match.group(0)
+        
+        # Handle protocol-relative URLs (//path) - check if they're actually local files
+        if url.startswith('//'):
+            test_path = url.lstrip('/')
+            test_full_path = safe_path(test_path)
+            if test_full_path and os.path.exists(test_full_path):
+                # This is a local file with // prefix - convert to preview-assets
+                new_url = f'/preview-assets/{test_path}'.replace('//', '/')
+                if not quote1 and not quote2:
+                    quote1 = quote2 = '"'
+                return f'{attr_name}={quote1}{new_url}{quote2}'
+            # If not local, it's external - preserve as-is
             return match.group(0)
         
         # For ANY absolute path starting with /, check if it's a local file first
@@ -319,10 +332,21 @@ def process_html_for_preview(html_content, file_path):
         suffix = match.group(5)  # ")" part
         
         # Skip external URLs, data URIs
-        if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+        if url.startswith(('http://', 'https://', 'data:', 'javascript:', 'blob:')):
             return match.group(0)
         
         if not url:
+            return match.group(0)
+        
+        # Handle protocol-relative URLs (//path) - check if they're actually local files
+        if url.startswith('//'):
+            test_path = url.lstrip('/')
+            test_full_path = safe_path(test_path)
+            if test_full_path and os.path.exists(test_full_path):
+                # This is a local file with // prefix - convert to preview-assets
+                new_url = f'/preview-assets/{test_path}'.replace('//', '/')
+                return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+            # If not local, it's external - preserve as-is
             return match.group(0)
         
         # Check if this is a local file with domain structure (like Wayback-Archive)
@@ -404,11 +428,20 @@ def process_html_for_preview(html_content, file_path):
             suffix = m.group(5)  # ")"
             
             # Skip external URLs, data URIs
-            if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+            if url.startswith(('http://', 'https://', 'data:', 'javascript:', 'blob:')):
                 return m.group(0)
             
             if not url:
                 return m.group(0)
+            
+            # Handle protocol-relative URLs (//path) - check if they're actually local files
+            if url.startswith('//'):
+                test_path = url.lstrip('/')
+                test_full_path = safe_path(test_path)
+                if test_full_path and os.path.exists(test_full_path):
+                    new_url = f'/preview-assets/{test_path}'.replace('//', '/')
+                    return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+                return m.group(0)  # External
             
             # For ANY absolute path starting with /, check if it's a local file first
             # This ensures images, fonts, and other assets in paths like /images/logo.png
@@ -449,11 +482,20 @@ def process_html_for_preview(html_content, file_path):
                 suffix = match.group(6)  # ")" part
                 
                 # Skip external URLs, data URIs
-                if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+                if url.startswith(('http://', 'https://', 'data:', 'javascript:', 'blob:')):
                     return match.group(0)
                 
                 if not url:
                     return match.group(0)
+                
+                # Handle protocol-relative URLs (//path) - check if they're actually local files
+                if url.startswith('//'):
+                    test_path = url.lstrip('/')
+                    test_full_path = safe_path(test_path)
+                    if test_full_path and os.path.exists(test_full_path):
+                        new_url = f'/preview-assets/{test_path}'.replace('//', '/')
+                        return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
+                    return match.group(0)  # External
                 
                 # For ANY absolute path starting with /, check if it's a local file first
                 if url.startswith('/'):
