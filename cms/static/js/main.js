@@ -1918,26 +1918,50 @@ function downloadCurrentFolder() {
     
     console.log('Downloading ZIP from root folder:', url);
     
-    // Use fetch to check if the download starts, then trigger download
-    fetch(url, { method: 'HEAD' })
+    // Show loading indicator
+    showToast('Preparing ZIP download...');
+    
+    // Use fetch to get the blob and download it properly
+    fetch(url, {
+        method: 'GET',
+        credentials: 'include' // Include cookies for authentication
+    })
         .then(response => {
-            if (response.ok) {
-                // Create a temporary anchor to trigger download
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = '';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } else {
-                alert('Error downloading ZIP file. Please check the console for details.');
-                console.error('Download failed:', response.status, response.statusText);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            // Get the filename from Content-Disposition header or use default
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'website.zip';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+            
+            // Convert response to blob
+            return response.blob().then(blob => ({ blob, filename }));
+        })
+        .then(({ blob, filename }) => {
+            // Create blob URL and trigger download
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up blob URL after a delay
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+            
+            showToast('Download started');
         })
         .catch(err => {
             console.error('Download error:', err);
-            // Fallback: direct navigation
-            window.location.href = url;
+            showToast('Error downloading ZIP file. Check console for details.');
+            alert('Error downloading ZIP file: ' + err.message);
         });
 }
 
