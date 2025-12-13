@@ -392,7 +392,9 @@ def process_html_for_preview(html_content, file_path):
     
     def fix_style_attribute(match):
         """Fix URLs inside style attributes."""
-        style_content = match.group(2)
+        prefix = match.group(1)  # 'style='
+        quote = match.group(2)   # Opening quote
+        style_content = match.group(3)  # The actual style content
         
         # Fix url() inside style
         style_content = re.sub(
@@ -402,7 +404,7 @@ def process_html_for_preview(html_content, file_path):
             flags=re.IGNORECASE
         )
         
-        return f'{match.group(1)}="{style_content}"'
+        return f'{prefix}{quote}{style_content}{quote}'
     
     # Fix all href, src, action, background, poster, etc.
     # Handle both quoted and unquoted attributes (common in minified HTML)
