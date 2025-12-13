@@ -13,3 +13,17 @@ build
 *.md
 html/
 .env
+.env.*
+*.log
+*.tmp
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.coverage
+.pytest_cache
+html/
+*.bak
+*.backup

@@ -2,35 +2,33 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    --no-install-recommends \
+# Set default environment variables (do this early for better caching)
+ENV CMS_BASE_DIR=/var/www/html \
+    PORT=5000 \
+    FLASK_APP=app.py \
+    PYTHONUNBUFFERED=1
+
+# Create volume mount points (do this early, rarely changes)
+RUN mkdir -p /var/www/html /.way-cms-backups && \
+    chmod 777 /var/www/html /.way-cms-backups
+
+# Install system dependencies (cache this layer)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Copy requirements first for better caching (dependencies change less frequently)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy application code (this layer will invalidate on code changes, but dependencies stay cached)
 COPY . .
-
-# Create volume mount points for website files and backups
-RUN mkdir -p /var/www/html && \
-    mkdir -p /.way-cms-backups && \
-    chmod 777 /var/www/html && \
-    chmod 777 /.way-cms-backups
 
 # Expose port
 EXPOSE 5000
 
-# Set default environment variables
-ENV CMS_BASE_DIR=/var/www/html
-ENV PORT=5000
-ENV FLASK_APP=app.py
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/login', timeout=5)" || exit 1
+# Health check (use curl or wget if available, or simple Python check)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import socket; s=socket.socket(); s.settimeout(1); result=s.connect_ex(('127.0.0.1', 5000)); s.close(); exit(0 if result == 0 else 1)" || exit 1
 
 # Run the application
 CMD ["python", "app.py"]
