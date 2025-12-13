@@ -9,7 +9,9 @@ import json
 import re
 import shutil
 import hashlib
-from datetime import datetime
+import threading
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory, abort, redirect, url_for, session, send_file
 from werkzeug.utils import secure_filename
@@ -1496,11 +1498,11 @@ def download_folder_zip():
         
         zip_buffer.seek(0)
         
-        # Determine filename
+        # Determine filename - use WEBSITE_NAME if available
         if path:
             zip_filename = f"{os.path.basename(path) or 'folder'}.zip"
         else:
-            zip_filename = f"{os.path.basename(CMS_BASE_DIR) or 'website'}.zip"
+            zip_filename = f"{get_website_name_for_backup()}.zip"
         
         return send_file(
             zip_buffer,
@@ -1743,6 +1745,185 @@ def serve_asset_fallback(asset_path):
     
     return send_file(full_path, mimetype=mimetype)
 
+
+# Automatic backup system
+AUTO_BACKUP_ENABLED = os.environ.get('AUTO_BACKUP_ENABLED', 'true').lower() == 'true'
+AUTO_BACKUP_DIR = os.path.join(BACKUP_DIR, 'auto')
+
+def get_website_name_for_backup():
+    """Get website name for backup filename."""
+    if WEBSITE_NAME:
+        # Sanitize for filename
+        return re.sub(r'[^a-zA-Z0-9_-]', '_', WEBSITE_NAME)
+    return os.path.basename(CMS_BASE_DIR.rstrip('/')) or 'website'
+
+def create_automatic_backup():
+    """Create an automatic backup of the entire website directory."""
+    if not AUTO_BACKUP_ENABLED:
+        return None
+    
+    try:
+        import zipfile
+        import io
+        
+        # Create auto backup directory
+        os.makedirs(AUTO_BACKUP_DIR, exist_ok=True)
+        
+        # Generate backup filename with timestamp
+        website_name = get_website_name_for_backup()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f"{website_name}_{timestamp}.zip"
+        backup_path = os.path.join(AUTO_BACKUP_DIR, backup_filename)
+        
+        # Create ZIP backup
+        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            if os.path.isdir(CMS_BASE_DIR):
+                for root, dirs, files in os.walk(CMS_BASE_DIR):
+                    # Skip backup directories
+                    dirs[:] = [d for d in dirs if not d.startswith('.way-cms')]
+                    
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        try:
+                            # Relative path within the archive
+                            arcname = os.path.relpath(file_path, CMS_BASE_DIR)
+                            zip_file.write(file_path, arcname)
+                        except (OSError, IOError) as e:
+                            # Skip files that can't be read (permissions, etc.)
+                            print(f"Warning: Could not backup {file_path}: {e}")
+        
+        return backup_path
+    except Exception as e:
+        print(f"Error creating automatic backup: {e}")
+        return None
+
+def manage_backup_retention():
+    """Manage backup retention: keep daily (7 days), weekly (4 weeks), monthly (12 months), yearly (all)."""
+    if not os.path.exists(AUTO_BACKUP_DIR):
+        return
+    
+    try:
+        now = datetime.now()
+        backups = []
+        
+        # Collect all backup files with their timestamps
+        for filename in os.listdir(AUTO_BACKUP_DIR):
+            if not filename.endswith('.zip'):
+                continue
+            
+            backup_path = os.path.join(AUTO_BACKUP_DIR, filename)
+            if not os.path.isfile(backup_path):
+                continue
+            
+            try:
+                # Extract timestamp from filename: website_name_YYYYMMDD_HHMMSS.zip
+                parts = filename.replace('.zip', '').split('_')
+                if len(parts) >= 3:
+                    date_str = parts[-2]  # YYYYMMDD
+                    backup_date = datetime.strptime(date_str, '%Y%m%d')
+                    backups.append((backup_path, backup_date, now - backup_date))
+            except (ValueError, IndexError):
+                # Skip files with invalid format
+                continue
+        
+        # Sort by date (oldest first)
+        backups.sort(key=lambda x: x[1])
+        
+        # Keep all yearly backups (first backup of each year)
+        yearly_backups = {}
+        for backup_path, backup_date, age in backups:
+            year = backup_date.year
+            if year not in yearly_backups:
+                yearly_backups[year] = backup_path
+        
+        # Keep all monthly backups (first backup of each month) for last 12 months
+        monthly_backups = {}
+        for backup_path, backup_date, age in backups:
+            if age.days <= 365:  # Within a year
+                month_key = (backup_date.year, backup_date.month)
+                if month_key not in monthly_backups:
+                    monthly_backups[month_key] = backup_path
+        
+        # Keep all weekly backups (first backup of each week) for last 4 weeks
+        weekly_backups = {}
+        for backup_path, backup_date, age in backups:
+            if age.days <= 28:  # Within 4 weeks
+                week_key = (backup_date.year, backup_date.isocalendar()[1])  # ISO week
+                if week_key not in weekly_backups:
+                    weekly_backups[week_key] = backup_path
+        
+        # Keep all daily backups for last 7 days
+        daily_backups = set()
+        for backup_path, backup_date, age in backups:
+            if age.days <= 7:
+                daily_backups.add(backup_path)
+        
+        # Combine all backups to keep
+        backups_to_keep = set(yearly_backups.values()) | set(monthly_backups.values()) | \
+                         set(weekly_backups.values()) | daily_backups
+        
+        # Delete backups not in the keep list
+        deleted_count = 0
+        for backup_path, backup_date, age in backups:
+            if backup_path not in backups_to_keep:
+                try:
+                    os.remove(backup_path)
+                    deleted_count += 1
+                except OSError as e:
+                    print(f"Warning: Could not delete old backup {backup_path}: {e}")
+        
+        if deleted_count > 0:
+            print(f"Cleaned up {deleted_count} old backup(s)")
+            
+    except Exception as e:
+        print(f"Error managing backup retention: {e}")
+
+def schedule_daily_backup():
+    """Schedule daily automatic backups."""
+    if not AUTO_BACKUP_ENABLED:
+        return
+    
+    def backup_worker():
+        while True:
+            try:
+                # Wait until next day at 2 AM
+                now = datetime.now()
+                next_backup = now.replace(hour=2, minute=0, second=0, microsecond=0)
+                if next_backup <= now:
+                    next_backup += timedelta(days=1)
+                
+                wait_seconds = (next_backup - now).total_seconds()
+                time.sleep(wait_seconds)
+                
+                # Create backup
+                print(f"Creating scheduled daily backup at {datetime.now()}")
+                create_automatic_backup()
+                
+                # Manage retention
+                manage_backup_retention()
+                
+            except Exception as e:
+                print(f"Error in backup scheduler: {e}")
+                # On error, retry after 1 hour
+                time.sleep(3600)
+    
+    # Start backup thread as daemon (will die with main process)
+    backup_thread = threading.Thread(target=backup_worker, daemon=True)
+    backup_thread.start()
+    print("Automatic backup scheduler started")
+
+# Initialize automatic backups on startup
+if AUTO_BACKUP_ENABLED:
+    # Create initial backup on startup
+    try:
+        print("Creating initial automatic backup...")
+        create_automatic_backup()
+        manage_backup_retention()
+    except Exception as e:
+        print(f"Warning: Could not create initial backup: {e}")
+    
+    # Start daily backup scheduler
+    schedule_daily_backup()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
