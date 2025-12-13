@@ -151,7 +151,7 @@ body {
     min-width: 0;
     justify-content: flex-end;
     align-items: center;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .zip-action {

@@ -32,14 +32,21 @@ function updateFileSizeToggleButton() {
 }
 
 // Header menu dropdown
-function toggleHeaderMenu() {
+function toggleHeaderMenu(e) {
+    if (e) {
+        e.stopPropagation();
+    }
     const dropdown = document.getElementById('header-menu-dropdown');
-    dropdown.classList.toggle('show');
+    if (dropdown) {
+        dropdown.classList.toggle('show');
+    }
 }
 
 function closeHeaderMenu() {
     const dropdown = document.getElementById('header-menu-dropdown');
-    dropdown.classList.remove('show');
+    if (dropdown) {
+        dropdown.classList.remove('show');
+    }
 }
 
 // Close dropdown when clicking outside
@@ -1998,61 +2005,68 @@ function updateHeaderButtonVisibility() {
     const buttons = Array.from(headerActions.querySelectorAll('.header-btn'));
     const zipButtons = Array.from(headerActions.querySelectorAll('.zip-action'));
     
-    // Reset all buttons to visible first
+    // Reset all buttons to visible first to get accurate measurements
     buttons.forEach(btn => {
         btn.classList.remove('hidden');
     });
     
     // Force a reflow to get accurate measurements
-    header.offsetHeight;
+    void header.offsetHeight;
     
     // Get dimensions
     const headerRect = header.getBoundingClientRect();
     const logoRect = logoContainer.getBoundingClientRect();
-    const menuRect = menuDropdown ? menuDropdown.getBoundingClientRect() : { width: 0 };
+    const menuRect = menuDropdown ? menuDropdown.getBoundingClientRect() : { width: 80 };
     
     // Calculate available space for buttons
-    const padding = 48; // Total padding (left + right)
+    const horizontalPadding = 48; // Total padding (left + right)
     const gap = 8; // Gap between buttons
     const logoWidth = logoRect.width;
-    const menuWidth = menuRect.width || 80; // Fallback if not measured
-    const availableWidth = headerRect.width - logoWidth - menuWidth - padding - (gap * 2);
+    const menuWidth = menuRect.width;
+    const minSpacing = gap * 2; // Minimum spacing
+    const availableWidth = headerRect.width - logoWidth - menuWidth - horizontalPadding - minSpacing;
     
-    // Measure all button widths
-    let totalButtonsWidth = 0;
-    const buttonWidths = [];
+    // Measure button widths (must measure while visible)
+    const buttonData = [];
+    let totalNeededWidth = 0;
     
+    // Add ZIP buttons first (always visible)
     zipButtons.forEach(btn => {
-        const width = btn.offsetWidth || btn.getBoundingClientRect().width;
-        buttonWidths.push({ btn, width });
-        totalButtonsWidth += width + gap;
+        const rect = btn.getBoundingClientRect();
+        const width = rect.width || btn.offsetWidth;
+        buttonData.push({ btn, width, alwaysVisible: true });
+        totalNeededWidth += width + gap;
     });
     
+    // Add regular buttons
     buttons.forEach(btn => {
-        const width = btn.offsetWidth || btn.getBoundingClientRect().width;
-        buttonWidths.push({ btn, width });
-        totalButtonsWidth += width + gap;
+        const rect = btn.getBoundingClientRect();
+        const width = rect.width || btn.offsetWidth;
+        buttonData.push({ btn, width, alwaysVisible: false });
+        totalNeededWidth += width + gap;
     });
     
-    // If buttons don't fit, hide them from right to left (but keep ZIP buttons visible)
-    if (totalButtonsWidth > availableWidth) {
-        // Start hiding from the rightmost header-btn (not ZIP buttons)
-        let currentWidth = zipButtons.reduce((sum, btn) => {
-            return sum + (btn.offsetWidth || btn.getBoundingClientRect().width) + gap;
-        }, 0);
+    // If buttons don't fit, hide from right to left (but keep ZIP buttons visible)
+    if (totalNeededWidth > availableWidth) {
+        // Calculate width of always-visible buttons (ZIP buttons + menu)
+        let usedWidth = buttonData
+            .filter(item => item.alwaysVisible)
+            .reduce((sum, item) => sum + item.width + gap, 0);
         
-        // Hide buttons in reverse order (rightmost first)
-        for (let i = buttonWidths.length - 1; i >= 0; i--) {
-            const { btn, width } = buttonWidths[i];
-            // Don't hide ZIP buttons
-            if (btn.classList.contains('zip-action')) {
-                continue;
-            }
+        // Now try to fit as many regular buttons as possible from left to right
+        for (let i = zipButtons.length; i < buttonData.length; i++) {
+            const { btn, width } = buttonData[i];
+            const buttonWidthWithGap = width + gap;
             
-            if (currentWidth + width + gap > availableWidth) {
-                btn.classList.add('hidden');
+            if (usedWidth + buttonWidthWithGap <= availableWidth) {
+                // Button fits, keep it visible
+                usedWidth += buttonWidthWithGap;
             } else {
-                currentWidth += width + gap;
+                // Button doesn't fit, hide it and all remaining buttons
+                for (let j = i; j < buttonData.length; j++) {
+                    buttonData[j].btn.classList.add('hidden');
+                }
+                break;
             }
         }
     }

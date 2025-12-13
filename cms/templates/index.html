@@ -111,14 +111,13 @@
         display: none;
         position: absolute;
         right: 0;
-        top: 100%;
+        top: calc(100% + 0.25rem);
         background: var(--bg-secondary);
         min-width: 200px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         border-radius: 8px;
         border: 1px solid var(--border-color);
-        z-index: 1000;
-        margin-top: 0.25rem;
+        z-index: 10000;
         overflow: hidden;
     }
     .menu-dropdown-content.show {
@@ -358,7 +357,7 @@
         
         <!-- Hamburger menu for overflow items -->
         <div class="menu-dropdown">
-            <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu()" id="header-menu-toggle">☰ More</button>
+            <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu(event)" id="header-menu-toggle">☰ More</button>
             <div class="menu-dropdown-content" id="header-menu-dropdown">
                 <a onclick="showUploadFileDialog(); closeHeaderMenu();">📁 Upload File</a>
                 <div class="menu-divider"></div>
