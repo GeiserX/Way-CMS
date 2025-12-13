@@ -83,7 +83,7 @@ docker-compose -f docker-compose.prod.yml up -d
   - Example: `CMS_PASSWORD=mySecurePassword123`
 - `CMS_PASSWORD_HASH`: Optional bcrypt hash (if set, `CMS_PASSWORD` is ignored)
   - **More secure**: Prevents storing plain password in environment variables
-  - Generate hash with: `python3 generate_password_hash.py "your-password"`
+  - Generate hash with: `python3 scripts/generate_password_hash.py "your-password"`
   - Example: `CMS_PASSWORD_HASH=$2b$12$abcd1234...` (long bcrypt hash)
 - `SECRET_KEY`: Flask secret key for sessions (default: auto-generated, **change in production!**)
 - `READ_ONLY_MODE`: Set to `true` to enable read-only mode (default: `false`)
