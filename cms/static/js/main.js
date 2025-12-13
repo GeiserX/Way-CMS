@@ -1,3 +1,96 @@
+// Resizable panes functionality
+function initResizablePanes() {
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarHandle = document.getElementById('sidebar-resize-handle');
+    const editorArea = document.querySelector('.editor-area');
+    
+    if (sidebarHandle && sidebar && editorArea) {
+        let isResizing = false;
+        
+        sidebarHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            
+            const startX = e.pageX;
+            const startWidth = sidebar.offsetWidth;
+            
+            function doResize(e) {
+                if (!isResizing) return;
+                const diff = e.pageX - startX;
+                const newWidth = Math.max(200, Math.min(window.innerWidth * 0.5, startWidth + diff));
+                sidebar.style.width = newWidth + 'px';
+            }
+            
+            function stopResize() {
+                isResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+            
+            document.addEventListener('mousemove', doResize);
+            document.addEventListener('mouseup', stopResize);
+        });
+    }
+    
+    // Resize handle between editor and preview
+    const editorPane = document.querySelector('.editor-pane');
+    const previewPane = document.querySelector('.preview-pane');
+    
+    if (editorPane && previewPane && previewPane.style.display !== 'none') {
+        // Create resize handle if it doesn't exist
+        if (!document.getElementById('editor-preview-resize-handle')) {
+            const handle = document.createElement('div');
+            handle.id = 'editor-preview-resize-handle';
+            handle.className = 'resize-handle';
+            previewPane.parentNode.insertBefore(handle, previewPane);
+            
+            let isResizing = false;
+            
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                
+                const startX = e.pageX;
+                const editorContainer = editorPane.parentElement;
+                const editorStartWidth = editorPane.offsetWidth;
+                
+                function doResize(e) {
+                    if (!isResizing) return;
+                    const diff = e.pageX - startX;
+                    const containerWidth = editorContainer.offsetWidth;
+                    const newEditorWidth = Math.max(200, Math.min(containerWidth - 200, editorStartWidth + diff));
+                    const editorPercent = (newEditorWidth / containerWidth) * 100;
+                    editorPane.style.flex = `0 0 ${editorPercent}%`;
+                    previewPane.style.flex = `0 0 ${100 - editorPercent}%`;
+                }
+                
+                function stopResize() {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+                
+                document.addEventListener('mousemove', doResize);
+                document.addEventListener('mouseup', stopResize);
+            });
+        }
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    initResizablePanes();
+});
+
+// Re-initialize when preview is toggled
+const originalTogglePreview = window.togglePreview;
+window.togglePreview = function() {
+    if (originalTogglePreview) originalTogglePreview();
+    setTimeout(initResizablePanes, 100);
+};
+
 // File browser navigation
 function navigateTo(path) {
     currentPath = path;

@@ -18,6 +18,10 @@ import mimetypes
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production-' + os.urandom(32).hex())
+# Configure permanent sessions with cookie expiration (30 days)
+app.config['PERMANENT_SESSION_LIFETIME'] = 2592000  # 30 days in seconds
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Configuration
 CMS_BASE_DIR = os.environ.get('CMS_BASE_DIR', '/var/www/html')
@@ -28,9 +32,22 @@ BACKUP_DIR = os.path.join(os.path.dirname(CMS_BASE_DIR), '.way-cms-backups')
 ALLOWED_EXTENSIONS = {'html', 'htm', 'css', 'js', 'txt', 'xml', 'json', 'md', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'zip'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 
-# Ensure directories exist
-Path(CMS_BASE_DIR).mkdir(parents=True, exist_ok=True)
-Path(BACKUP_DIR).mkdir(parents=True, exist_ok=True)
+# Ensure directories exist - gracefully handle permission errors
+try:
+    Path(CMS_BASE_DIR).mkdir(parents=True, exist_ok=True)
+except (PermissionError, OSError):
+    # Fallback for CI/testing environments
+    import tempfile
+    CMS_BASE_DIR = tempfile.mkdtemp(prefix='way-cms-')
+    Path(CMS_BASE_DIR).mkdir(parents=True, exist_ok=True)
+
+try:
+    Path(BACKUP_DIR).mkdir(parents=True, exist_ok=True)
+except (PermissionError, OSError):
+    # Fallback for CI/testing environments - use temp directory
+    import tempfile
+    BACKUP_DIR = tempfile.mkdtemp(prefix='way-cms-backups-')
+    Path(BACKUP_DIR).mkdir(parents=True, exist_ok=True)
 
 # Initialize password hash if plain password provided
 if CMS_PASSWORD and not CMS_PASSWORD_HASH:
@@ -153,6 +170,7 @@ def login():
         elif password == CMS_PASSWORD:
             session['logged_in'] = True
             session['username'] = username
+            session.permanent = True  # Make session permanent (use cookie expiration)
             return redirect(url_for('index'))
         
         return render_template('login.html', error='Invalid username or password')
@@ -224,8 +242,12 @@ def process_html_for_preview(html_content, file_path):
         url = match.group(3)        # URL
         quote2 = match.group(4) or ''     # Closing quote (can be empty for unquoted)
         
-        # Skip external URLs, data URIs, javascript, anchors, etc.
+            # Skip external URLs (including fonts.googleapis.com), data URIs, javascript, anchors, etc.
         if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', '#', 'mailto:', 'tel:', 'blob:')):
+            return match.group(0)
+        
+        # Allow external font services to load
+        if 'fonts.googleapis.com' in url or 'fonts.gstatic.com' in url or 'cdnjs.cloudflare.com' in url:
             return match.group(0)
         
         # Skip empty URLs
@@ -286,12 +308,12 @@ def process_html_for_preview(html_content, file_path):
     # Fix style attributes (for inline styles with url())
     html_content = re.sub(r'(style=)(["\'])([^"\']+)(["\'])', fix_style_attribute, html_content, flags=re.IGNORECASE)
     
-    # Fix CSS url() in <style> tags - use DOTALL to handle multiline
+    # Fix @font-face rules and CSS url() in <style> tags - use DOTALL to handle multiline
     def fix_style_tag(match):
         tag_attrs = match.group(1) or ''
         style_content = match.group(2)
         
-        # Fix all url() references in CSS
+        # Fix all url() references in CSS (including font files)
         def fix_url_in_css(m):
             prefix = m.group(1)  # "url("
             quote1 = m.group(2) or ''
@@ -299,16 +321,37 @@ def process_html_for_preview(html_content, file_path):
             quote2 = m.group(4) or ''
             suffix = m.group(5)  # ")"
             
+            # Skip external URLs (fonts.googleapis.com, etc.), data URIs
             if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
                 return m.group(0)
             
             if not url:
                 return m.group(0)
             
-            # Resolve path
+            # Resolve path (handles font files: .woff, .woff2, .ttf, .eot, etc.)
             resolved = resolve_relative_path(file_path, url)
             new_url = f'/preview-assets/{resolved}'.replace('//', '/')
             return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+        
+        # Fix @font-face src declarations
+        def fix_font_face(m):
+            font_face_content = m.group(1)
+            # Fix url() inside @font-face
+            font_face_content = re.sub(
+                r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
+                fix_url_in_css,
+                font_face_content,
+                flags=re.IGNORECASE
+            )
+            return f'@font-face{{{font_face_content}}}'
+        
+        # Fix @font-face rules
+        style_content = re.sub(
+            r'@font-face\s*\{([^}]+)\}',
+            fix_font_face,
+            style_content,
+            flags=re.IGNORECASE | re.DOTALL
+        )
         
         # Pattern for url() in CSS - handles whitespace and quotes
         css_url_pattern = r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))'
