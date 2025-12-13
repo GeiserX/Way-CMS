@@ -43,6 +43,7 @@ html/
 cms/html/
 .env
 *.log
+website/
 
 # Temporary files
 *.tmp

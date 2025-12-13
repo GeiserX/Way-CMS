@@ -60,7 +60,8 @@ Way-CMS runs with **two services**: a public website (nginx) and the CMS admin i
 
 ### Environment Variables
 
-- `CMS_BASE_DIR`: Directory containing your website files (default: `/var/www/html`)
+- `WEBSITE_DIR`: Path to your website files directory (default: `./website`, can be absolute or relative)
+- `CMS_BASE_DIR`: Directory containing your website files inside container (default: `/var/www/html` - **do not change**)
 - `CMS_USERNAME`: Admin username (default: `admin`)
 - `CMS_PASSWORD`: Admin password in plain text (will be hashed automatically)
 - `CMS_PASSWORD_HASH`: Optional bcrypt hash (if set, `CMS_PASSWORD` is ignored)
@@ -76,8 +77,10 @@ See `.env.example` for a complete example configuration file.
 
 ### Volumes
 
-- `./website` - Your website files (read-only for nginx, read-write for CMS)
+- `WEBSITE_DIR` (configurable via env var, default: `./website`) - Your website files (read-only for nginx, read-write for CMS)
 - `./.way-cms-backups` - Backup storage directory
+
+**Note:** The website directory path is configurable via the `WEBSITE_DIR` environment variable. You can use an absolute path or a relative path to point to any directory containing your website files.
 
 ### Ports
 
