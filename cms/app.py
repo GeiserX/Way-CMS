@@ -25,7 +25,7 @@ CMS_BASE_DIR = os.environ.get('CMS_BASE_DIR', '/var/www/html')
 CMS_USERNAME = os.environ.get('CMS_USERNAME', 'admin')
 CMS_PASSWORD_HASH = os.environ.get('CMS_PASSWORD_HASH', '')  # bcrypt hash
 CMS_PASSWORD = os.environ.get('CMS_PASSWORD', '')  # Plain password (legacy, will hash it)
-BACKUP_DIR = os.path.join(os.path.dirname(CMS_BASE_DIR), '.way-cms-backups')
+BACKUP_DIR = os.environ.get('BACKUP_DIR', '/.way-cms-backups')  # Fixed path for docker mount
 ALLOWED_EXTENSIONS = {'html', 'htm', 'css', 'js', 'txt', 'xml', 'json', 'md', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'zip', 'ico', 'woff', 'woff2', 'ttf', 'eot'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 READ_ONLY_MODE = os.environ.get('READ_ONLY_MODE', 'false').lower() == 'true'
@@ -1304,36 +1304,60 @@ def create_manual_backup():
 @app.route('/api/folder-backups', methods=['GET'])
 @login_required
 def list_folder_backups():
-    """List all folder backups (ZIP files)."""
+    """List all folder backups (ZIP files) including automatic backups."""
     folder_path = request.args.get('path', '')
-    folder_backup_dir = os.path.join(BACKUP_DIR, 'folders', folder_path if folder_path else 'root')
-    
-    if not os.path.exists(folder_backup_dir):
-        return jsonify({'backups': []})
     
     backups = []
-    try:
-        for item in os.listdir(folder_backup_dir):
-            if item.endswith('.zip'):
-                item_path = os.path.join(folder_backup_dir, item)
-                if os.path.isfile(item_path):
-                    stat = os.stat(item_path)
-                    # Extract backup name (without .zip)
-                    backup_name = item[:-4] if item.endswith('.zip') else item
-                    
-                    backups.append({
-                        'name': backup_name,
-                        'filename': item,
-                        'path': item_path.replace(BACKUP_DIR, '').lstrip('/'),
-                        'size': stat.st_size,
-                        'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                        'formatted_date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-                    })
-        
-        backups.sort(key=lambda x: x['modified'], reverse=True)
-        return jsonify({'backups': backups})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    
+    # Check manual backups directory
+    folder_backup_dir = os.path.join(BACKUP_DIR, 'folders', folder_path if folder_path else 'root')
+    if os.path.exists(folder_backup_dir):
+        try:
+            for item in os.listdir(folder_backup_dir):
+                if item.endswith('.zip'):
+                    item_path = os.path.join(folder_backup_dir, item)
+                    if os.path.isfile(item_path):
+                        stat = os.stat(item_path)
+                        backup_name = item[:-4] if item.endswith('.zip') else item
+                        
+                        backups.append({
+                            'name': backup_name,
+                            'filename': item,
+                            'path': item_path.replace(BACKUP_DIR, '').lstrip('/'),
+                            'size': stat.st_size,
+                            'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            'formatted_date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                            'type': 'manual'
+                        })
+        except Exception as e:
+            print(f"Error reading manual backups: {e}")
+    
+    # Check automatic backups directory (only for root path)
+    if not folder_path:
+        auto_backup_dir = os.path.join(BACKUP_DIR, 'auto')
+        if os.path.exists(auto_backup_dir):
+            try:
+                for item in os.listdir(auto_backup_dir):
+                    if item.endswith('.zip'):
+                        item_path = os.path.join(auto_backup_dir, item)
+                        if os.path.isfile(item_path):
+                            stat = os.stat(item_path)
+                            backup_name = item[:-4] if item.endswith('.zip') else item
+                            
+                            backups.append({
+                                'name': f"[Auto] {backup_name}",
+                                'filename': item,
+                                'path': f"auto/{item}",
+                                'size': stat.st_size,
+                                'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                                'formatted_date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                                'type': 'auto'
+                            })
+            except Exception as e:
+                print(f"Error reading automatic backups: {e}")
+    
+    backups.sort(key=lambda x: x['modified'], reverse=True)
+    return jsonify({'backups': backups})
 
 
 @app.route('/api/create-folder-backup', methods=['POST'])
@@ -1431,6 +1455,29 @@ def restore_folder_backup():
             zip_file.extractall(full_folder_path)
         
         return jsonify({'success': True, 'message': 'Folder restored successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/trigger-auto-backup', methods=['POST'])
+@login_required
+@read_only_check
+def trigger_auto_backup():
+    """Manually trigger an automatic backup."""
+    try:
+        backup_path = create_automatic_backup()
+        if backup_path:
+            stat = os.stat(backup_path)
+            return jsonify({
+                'success': True,
+                'backup': {
+                    'path': backup_path.replace(BACKUP_DIR, '').lstrip('/'),
+                    'size': stat.st_size,
+                    'formatted_date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+        else:
+            return jsonify({'error': 'Failed to create backup'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1771,20 +1818,24 @@ def get_website_name_for_backup():
 def create_automatic_backup():
     """Create an automatic backup of the entire website directory."""
     if not AUTO_BACKUP_ENABLED:
+        print("[AutoBackup] Automatic backups disabled")
         return None
     
     try:
         import zipfile
-        import io
+        
+        print(f"[AutoBackup] Creating backup... BACKUP_DIR={BACKUP_DIR}, AUTO_BACKUP_DIR={AUTO_BACKUP_DIR}")
         
         # Create auto backup directory
         os.makedirs(AUTO_BACKUP_DIR, exist_ok=True)
+        print(f"[AutoBackup] Directory created/exists: {AUTO_BACKUP_DIR}")
         
         # Generate backup filename with timestamp
         website_name = get_website_name_for_backup()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         backup_filename = f"{website_name}_{timestamp}.zip"
         backup_path = os.path.join(AUTO_BACKUP_DIR, backup_filename)
+        print(f"[AutoBackup] Creating backup at: {backup_path}")
         
         # Create ZIP backup
         with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
@@ -1801,11 +1852,14 @@ def create_automatic_backup():
                             zip_file.write(file_path, arcname)
                         except (OSError, IOError) as e:
                             # Skip files that can't be read (permissions, etc.)
-                            print(f"Warning: Could not backup {file_path}: {e}")
+                            print(f"[AutoBackup] Warning: Could not backup {file_path}: {e}")
         
+        print(f"[AutoBackup] Backup created successfully: {backup_path}")
         return backup_path
     except Exception as e:
-        print(f"Error creating automatic backup: {e}")
+        print(f"[AutoBackup] Error creating automatic backup: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def manage_backup_retention():

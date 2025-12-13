@@ -1917,52 +1917,18 @@ function downloadCurrentFolder() {
     const url = `${API_BASE}/api/download-zip?path=${encodeURIComponent(path)}`;
     
     console.log('Downloading ZIP from root folder:', url);
+    showToast('Starting ZIP download...');
     
-    // Show loading indicator
-    showToast('Preparing ZIP download...');
-    
-    // Use fetch to get the blob and download it properly
-    fetch(url, {
-        method: 'GET',
-        credentials: 'include' // Include cookies for authentication
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            // Get the filename from Content-Disposition header or use default
-            const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'website.zip';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1].replace(/['"]/g, '');
-                }
-            }
-            
-            // Convert response to blob
-            return response.blob().then(blob => ({ blob, filename }));
-        })
-        .then(({ blob, filename }) => {
-            // Create blob URL and trigger download
-            const blobUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Clean up blob URL after a delay
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-            
-            showToast('Download started');
-        })
-        .catch(err => {
-            console.error('Download error:', err);
-            showToast('Error downloading ZIP file. Check console for details.');
-            alert('Error downloading ZIP file: ' + err.message);
-        });
+    // Simple approach: use an iframe to trigger download
+    // This avoids fetch blob issues with large files
+    let iframe = document.getElementById('download-iframe');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'download-iframe';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+    }
+    iframe.src = url;
 }
 
 // Upload ZIP functionality
