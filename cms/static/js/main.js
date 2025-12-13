@@ -232,8 +232,8 @@ function openFile(path) {
             if (isHtml && previewEnabled) {
                 const iframe = document.getElementById('preview-iframe');
                 if (iframe) {
-                    // Use the preview endpoint which processes the file correctly
-                    // This will load with all assets properly resolved
+                    // Use iframe.src instead of srcdoc for better cookie/session handling
+                    // This ensures assets can load with proper authentication
                     const previewUrl = `/preview/${encodeURIComponent(path)}`;
                     iframe.src = previewUrl;
                     
@@ -329,31 +329,11 @@ function updatePreview() {
         })
         .then(data => {
             if (data.html) {
-                // Use srcdoc - this works better than blob URLs for base tags
+                // For better asset loading with cookies/sessions, save content and reload via src
+                // Create a blob URL that points back to our server for proper asset resolution
+                // Actually, use iframe.src pointing to /preview/ endpoint for proper cookie handling
+                // But for real-time updates, we need srcdoc - so ensure base tag is correct
                 previewIframe.srcdoc = data.html;
-                
-                // If srcdoc doesn't work well, fallback to blob URL with proper origin
-                setTimeout(() => {
-                    // Check if iframe loaded successfully
-                    try {
-                        const iframeDoc = previewIframe.contentDocument || previewIframe.contentWindow.document;
-                        if (!iframeDoc || iframeDoc.readyState !== 'complete') {
-                            // Fallback: create blob URL with processed HTML
-                            const blob = new Blob([data.html], { type: 'text/html' });
-                            const url = URL.createObjectURL(blob);
-                            const oldSrc = previewIframe.src;
-                            previewIframe.src = url;
-                            if (oldSrc && oldSrc.startsWith('blob:')) {
-                                URL.revokeObjectURL(oldSrc);
-                            }
-                        }
-                    } catch (e) {
-                        // Cross-origin or other error - use blob fallback
-                        const blob = new Blob([data.html], { type: 'text/html' });
-                        const url = URL.createObjectURL(blob);
-                        previewIframe.src = url;
-                    }
-                }, 100);
             }
         })
         .catch(err => {

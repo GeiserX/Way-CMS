@@ -405,10 +405,50 @@ def process_html_for_preview(html_content, file_path):
             new_url = f'/preview-assets/{resolved}'.replace('//', '/')
             return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
         
-        # Fix @font-face src declarations
+        # Fix @font-face src declarations (handles src:url(...) format)
         def fix_font_face(m):
             font_face_content = m.group(1)
-            # Fix url() inside @font-face
+            # Fix src:url(...) format (common in Font Awesome and other icon fonts)
+            def fix_src_url(match):
+                prefix = match.group(1)  # "src:" part
+                url_part = match.group(2)  # "url(" part
+                quote1 = match.group(3) or ''
+                url = match.group(4)
+                quote2 = match.group(5) or ''
+                suffix = match.group(6)  # ")" part
+                
+                # Skip external URLs, data URIs
+                if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+                    return match.group(0)
+                
+                if not url:
+                    return match.group(0)
+                
+                # Check for local files with domain structure
+                local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
+                for domain_path in local_domain_paths:
+                    if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
+                        test_path = url.lstrip('/')
+                        test_full_path = safe_path(test_path)
+                        if test_full_path and os.path.exists(test_full_path):
+                            resolved = resolve_relative_path(file_path, url)
+                            new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                            return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
+                
+                # Resolve path for local files
+                resolved = resolve_relative_path(file_path, url)
+                new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
+            
+            # Fix both src:url(...) and url(...) formats
+            # Pattern for src:url(...) - handles Font Awesome format
+            font_face_content = re.sub(
+                r'(src\s*:\s*)(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
+                fix_src_url,
+                font_face_content,
+                flags=re.IGNORECASE
+            )
+            # Pattern for regular url(...) - handles Google Fonts format
             font_face_content = re.sub(
                 r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
                 fix_url_in_css,
@@ -473,7 +513,6 @@ def preview_file(file_path):
 
 @app.route('/preview-assets/', defaults={'asset_path': ''})
 @app.route('/preview-assets/<path:asset_path>')
-@login_required
 def preview_assets(asset_path):
     """Serve assets for preview (CSS, JS, images, etc.)."""
     # Normalize path - remove leading/trailing slashes, but handle empty
