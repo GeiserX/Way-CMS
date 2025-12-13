@@ -18,14 +18,7 @@ import mimetypes
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production-' + os.urandom(32).hex())
-# Configure sessions with configurable timeout
-app.config['PERMANENT_SESSION_LIFETIME'] = SESSION_TIMEOUT_MINUTES * 60  # Convert minutes to seconds
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-
-# Configuration
+# Configuration - must be defined before app config
 CMS_BASE_DIR = os.environ.get('CMS_BASE_DIR', '/var/www/html')
 CMS_USERNAME = os.environ.get('CMS_USERNAME', 'admin')
 CMS_PASSWORD_HASH = os.environ.get('CMS_PASSWORD_HASH', '')  # bcrypt hash
@@ -35,6 +28,13 @@ ALLOWED_EXTENSIONS = {'html', 'htm', 'css', 'js', 'txt', 'xml', 'json', 'md', 'p
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 READ_ONLY_MODE = os.environ.get('READ_ONLY_MODE', 'false').lower() == 'true'
 SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '1440'))  # Default 24 hours
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production-' + os.urandom(32).hex())
+# Configure sessions with configurable timeout
+app.config['PERMANENT_SESSION_LIFETIME'] = SESSION_TIMEOUT_MINUTES * 60  # Convert minutes to seconds
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Rate limiting - initialize after app is created
 try:
@@ -383,7 +383,8 @@ def process_html_for_preview(html_content, file_path):
     # Fix all href, src, action, background, poster, etc.
     # Handle both quoted and unquoted attributes (common in minified HTML)
     # Improved pattern to handle quoted and unquoted attributes more reliably
-    attributes_pattern = r'\b(href|src|action|background|poster|data-src|data-background|data-bg)\s*=\s*(["\'"]?)([^"\'"<>]*?)(["\'"]?)(?=[\s>])'
+    # Match href=/path or href="/path" or href='/path'
+    attributes_pattern = r'\b(href|src|action|background|poster|data-src|data-background|data-bg)\s*=\s*(["\']?)([^"\'\s<>]+)(["\']?)'
     html_content = re.sub(attributes_pattern, fix_url_attribute, html_content, flags=re.IGNORECASE)
     
     # Fix style attributes (for inline styles with url())
@@ -1418,6 +1419,77 @@ def get_config():
         'allowed_extensions': list(ALLOWED_EXTENSIONS),
         'max_file_size': MAX_FILE_SIZE
     })
+
+
+# Catch-all route for serving assets directly from website directory
+# This is a fallback for when HTML rewriting doesn't catch all paths
+@app.route('/<path:asset_path>')
+def serve_asset_fallback(asset_path):
+    """Serve assets directly from website directory as fallback."""
+    # Only serve if it looks like a static asset (not API or HTML pages)
+    if asset_path.startswith('api/') or asset_path.startswith('preview'):
+        abort(404)
+    
+    full_path = safe_path(asset_path)
+    if not full_path or not os.path.exists(full_path) or not os.path.isfile(full_path):
+        abort(404)
+    
+    # Security: ensure within CMS_BASE_DIR
+    if not os.path.abspath(full_path).startswith(os.path.abspath(CMS_BASE_DIR)):
+        abort(403)
+    
+    # Determine MIME type
+    mimetype = mimetypes.guess_type(full_path)[0]
+    
+    # Set appropriate MIME types for common assets
+    if full_path.endswith('.css'):
+        mimetype = 'text/css; charset=utf-8'
+        # Process CSS to fix url() references
+        try:
+            with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
+                css_content = f.read()
+            
+            def fix_css_url_fallback(match):
+                prefix = match.group(1)
+                quote1 = match.group(2) or ''
+                url = match.group(3)
+                quote2 = match.group(4) or ''
+                suffix = match.group(5)
+                
+                if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+                    return match.group(0)
+                
+                if not url:
+                    return match.group(0)
+                
+                # For absolute paths, check if local
+                if url.startswith('/'):
+                    test_path = url.lstrip('/')
+                    test_full_path = safe_path(test_path)
+                    if test_full_path and os.path.exists(test_full_path):
+                        return match.group(0)  # File exists, keep as-is since catch-all will serve it
+                
+                return match.group(0)
+            
+            css_url_pattern = r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))'
+            css_content = re.sub(css_url_pattern, fix_css_url_fallback, css_content, flags=re.IGNORECASE)
+            
+            return css_content, 200, {'Content-Type': mimetype}
+        except Exception:
+            pass
+    elif full_path.endswith('.woff'):
+        mimetype = 'font/woff'
+    elif full_path.endswith('.woff2'):
+        mimetype = 'font/woff2'
+    elif full_path.endswith('.ttf'):
+        mimetype = 'font/ttf'
+    elif full_path.endswith('.eot'):
+        mimetype = 'application/vnd.ms-fontobject'
+    
+    if not mimetype:
+        mimetype = 'application/octet-stream'
+    
+    return send_file(full_path, mimetype=mimetype)
 
 
 if __name__ == '__main__':
