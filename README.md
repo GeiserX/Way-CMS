@@ -11,21 +11,26 @@ A simple, web-accessible CMS for editing HTML/CSS files downloaded from Wayback 
 - **Password Protection**: Optional password protection (set via environment variable)
 - **Docker Support**: Easy deployment with Docker and Docker Compose
 
-## Quick Start with Docker
+## Quick Start with Docker (Recommended)
+
+Way-CMS now runs with **two services**: a public website (nginx) and the CMS admin interface (Flask).
 
 1. **Create a directory for your website files:**
    ```bash
-   mkdir -p ./html
-   # Copy your Wayback Archive downloaded files here
+   mkdir website
+   # Copy your Wayback Archive downloaded files into the website directory
    ```
 
-2. **Run with Docker Compose:**
+2. **Start the services:**
    ```bash
    docker-compose up -d
    ```
 
-3. **Access the CMS:**
-   Open your browser to `http://localhost:5000`
+3. **Access the services:**
+   - **Public Website**: http://localhost (port 80)
+   - **CMS Admin**: http://localhost:5000 (port 5000)
+
+See [DOCKER.md](DOCKER.md) for detailed setup instructions and production deployment guide.
 
 ## Configuration
 
