@@ -280,18 +280,38 @@ def process_html_for_preview(html_content, file_path):
     # Fix style attributes (for inline styles with url())
     html_content = re.sub(r'(style=)(["\'])([^"\']+)(["\'])', fix_style_attribute, html_content, flags=re.IGNORECASE)
     
-    # Fix CSS url() in <style> tags and external style tags
+    # Fix CSS url() in <style> tags - use DOTALL to handle multiline
     def fix_style_tag(match):
+        tag_attrs = match.group(1) or ''
         style_content = match.group(2)
-        style_content = re.sub(
-            r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
-            fix_css_url,
-            style_content,
-            flags=re.IGNORECASE
-        )
-        return f'<style{match.group(1)}>{style_content}</style>'
+        
+        # Fix all url() references in CSS
+        def fix_url_in_css(m):
+            prefix = m.group(1)  # "url("
+            quote1 = m.group(2) or ''
+            url = m.group(3)
+            quote2 = m.group(4) or ''
+            suffix = m.group(5)  # ")"
+            
+            if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+                return m.group(0)
+            
+            if not url:
+                return m.group(0)
+            
+            # Resolve path
+            resolved = resolve_relative_path(file_path, url)
+            new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+            return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+        
+        # Pattern for url() in CSS - handles whitespace and quotes
+        css_url_pattern = r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))'
+        style_content = re.sub(css_url_pattern, fix_url_in_css, style_content, flags=re.IGNORECASE)
+        
+        return f'<style{tag_attrs}>{style_content}</style>'
     
-    html_content = re.sub(r'<style([^>]*)>([^<]*(?:<[^/][^>]*>[^<]*)*)</style>', fix_style_tag, html_content, flags=re.IGNORECASE | re.DOTALL)
+    # Match style tags - including multiline content
+    html_content = re.sub(r'<style([^>]*)>((?:[^<]|<(?!/style>))*?)</style>', fix_style_tag, html_content, flags=re.IGNORECASE | re.DOTALL)
     
     # Inject base tag for additional compatibility
     base_url = f'/preview-assets/{file_dir}/' if file_dir else '/preview-assets/'
