@@ -85,22 +85,20 @@ function syncHeaderOverflow() {
     const header = document.querySelector('.header');
     const main = document.getElementById('header-actions-main');
     const overflowList = document.getElementById('header-menu-overflow-items');
-    const overflowDivider = document.getElementById('header-menu-overflow-divider');
     const overflowBtn = document.getElementById('header-overflow');
     
     if (!main || !overflowList || !header) return;
 
-    // Clear overflow menu (but keep permanent items like Theme, Settings, Logout in HTML)
+    // Clear overflow menu
     overflowList.innerHTML = '';
-    if (overflowDivider) overflowDivider.style.display = 'none';
 
     const allButtons = Array.from(main.querySelectorAll('.header-action-btn'));
     
     // Reset all buttons to visible first
     allButtons.forEach((btn) => btn.classList.remove('is-overflowed'));
-
-    // NEVER hide the ☰ menu - it contains essential items (Theme, Shortcuts, Settings, Logout)
-    // Always keep it visible!
+    
+    // Hide overflow button initially to measure without it
+    if (overflowBtn) overflowBtn.style.display = 'none';
 
     // Force layout
     void header.offsetWidth;
@@ -109,12 +107,11 @@ function syncHeaderOverflow() {
     const headerRect = header.getBoundingClientRect();
     const logoContainer = header.querySelector('div:first-child');
     const logoWidth = logoContainer ? logoContainer.getBoundingClientRect().width : 150;
-    const overflowBtnWidth = overflowBtn ? overflowBtn.getBoundingClientRect().width : 50;
     const gap = 8;
     const padding = 48; // 1.5rem * 2
     
-    // Available space for buttons (always account for overflow button since it's always shown)
-    const availableWidth = headerRect.width - logoWidth - overflowBtnWidth - padding - (gap * 3);
+    // Available space WITHOUT overflow button
+    const availableWidthWithoutOverflow = headerRect.width - logoWidth - padding - gap;
     
     // Measure all button widths
     let totalWidth = 0;
@@ -126,15 +123,22 @@ function syncHeaderOverflow() {
     });
     if (buttonWidths.length > 0) totalWidth -= gap; // Remove last gap
     
-    // If all buttons fit, show them all (but keep ☰ menu visible for permanent items)
-    if (totalWidth <= availableWidth) {
-        // All buttons fit! No overflow needed
+    // If all buttons fit, show them all and hide ☰ menu
+    if (totalWidth <= availableWidthWithoutOverflow) {
+        // All buttons fit! Hide overflow menu
+        if (overflowBtn) overflowBtn.style.display = 'none';
         return;
     }
     
-    // Need to overflow some buttons
+    // Need overflow - show the ☰ button and recalculate
+    if (overflowBtn) overflowBtn.style.display = '';
+    void header.offsetWidth; // Force layout again
+    
+    const overflowBtnWidth = overflowBtn ? overflowBtn.getBoundingClientRect().width : 50;
+    const availableWidth = headerRect.width - logoWidth - overflowBtnWidth - padding - (gap * 2);
+    
+    // Fit as many buttons as possible
     let currentWidth = 0;
-    let overflowCount = 0;
     
     for (const item of buttonWidths) {
         const btnWidth = item.width + gap;
@@ -145,13 +149,7 @@ function syncHeaderOverflow() {
             // Move to overflow
             item.btn.classList.add('is-overflowed');
             overflowList.appendChild(buildOverflowMenuItemForButton(item.btn));
-            overflowCount++;
         }
-    }
-
-    // Show divider between overflowed buttons and permanent items
-    if (overflowDivider && overflowCount > 0) {
-        overflowDivider.style.display = 'block';
     }
 }
 

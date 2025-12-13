@@ -283,30 +283,26 @@
     </div>
     <div class="header-actions" id="header-actions">
         <div class="header-actions-main" id="header-actions-main">
-            <!-- All action buttons - will overflow into ☰ menu when space is limited -->
+            <!-- ALL buttons - overflow into ☰ menu when space is limited -->
             <button class="btn btn-primary header-action-btn is-overflowable" onclick="downloadCurrentFolder()" data-overflow-label="📦 ZIP Export">📦 ZIP Export</button>
             <button class="btn btn-primary header-action-btn is-overflowable" onclick="showUploadZipDialog()" data-overflow-label="📤 ZIP Import">📤 ZIP Import</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleSearch()" data-overflow-label="🔍 Search">🔍 Search</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleGlobalReplace()" data-overflow-label="🔄 Replace">🔄 Replace</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleBackups()" data-overflow-label="💾 Backups">💾 Backups</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="refreshFiles()" data-overflow-label="🔄 Refresh">🔄 Refresh</button>
-            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showUploadFileDialog()" data-overflow-label="📁 Upload File">📁 Upload</button>
-            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleFileSizeDisplay()" id="toggle-filesize-btn-header" data-overflow-label="📏 File Sizes">📏 Sizes</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showUploadFileDialog()" data-overflow-label="📁 Upload">📁 Upload</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleFileSizeDisplay()" data-overflow-label="📏 Sizes">📏 Sizes</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleTheme()" data-overflow-label="🌓 Theme">🌓 Theme</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showKeyboardShortcuts()" data-overflow-label="⌨️ Shortcuts">⌨️ Shortcuts</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="exportSettings()" data-overflow-label="📤 Export">📤 Export</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="importSettings()" data-overflow-label="📥 Import">📥 Import</button>
+            <a class="btn btn-secondary header-action-btn is-overflowable" href="{{ url_for('logout') }}" data-overflow-label="🚪 Logout">🚪 Logout</a>
         </div>
 
-        <div class="menu-dropdown header-overflow" id="header-overflow" style="display: flex;">
+        <div class="menu-dropdown header-overflow" id="header-overflow">
             <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu(event)" id="header-menu-toggle" aria-haspopup="true" aria-expanded="false">☰</button>
             <div class="menu-dropdown-content" id="header-menu-dropdown" role="menu" aria-labelledby="header-menu-toggle">
                 <div id="header-menu-overflow-items"></div>
-                <div class="menu-divider" id="header-menu-overflow-divider" style="display:none;"></div>
-
-                <!-- Always in menu (less frequently used) -->
-                <a onclick="showKeyboardShortcuts(); closeHeaderMenu();" role="menuitem">⌨️ Keyboard Shortcuts</a>
-                <a onclick="exportSettings(); closeHeaderMenu();" role="menuitem">📤 Export Settings</a>
-                <a onclick="importSettings(); closeHeaderMenu();" role="menuitem">📥 Import Settings</a>
-                <div class="menu-divider"></div>
-                <a href="{{ url_for('logout') }}" role="menuitem">🚪 Logout</a>
             </div>
         </div>
     </div>
