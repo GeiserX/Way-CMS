@@ -76,12 +76,26 @@ def has_auth_configured():
 
 
 def safe_path(file_path):
-    """Ensure path is within base directory."""
-    full_path = os.path.join(CMS_BASE_DIR, file_path) if file_path else CMS_BASE_DIR
+    """Ensure path is within base directory - security hardened."""
+    if not file_path:
+        return os.path.abspath(CMS_BASE_DIR)
+    
+    # Normalize the path - remove any .. or . components
+    # Use os.path.normpath but then verify it's still within base
+    normalized = os.path.normpath(file_path).replace('\\', '/')
+    
+    # Remove any leading slashes or dots that could be dangerous
+    normalized = normalized.lstrip('/').lstrip('.')
+    
+    # Join with base directory
+    full_path = os.path.join(CMS_BASE_DIR, normalized)
     full_path = os.path.abspath(full_path)
     base_path = os.path.abspath(CMS_BASE_DIR)
-    if not full_path.startswith(base_path):
+    
+    # Critical security check: ensure resolved path is within base
+    if not full_path.startswith(base_path + os.sep) and full_path != base_path:
         return None
+    
     return full_path
 
 
@@ -110,7 +124,9 @@ def create_backup(file_path):
 @login_required
 def index():
     """Main page showing file browser."""
-    return render_template('index.html', base_dir=CMS_BASE_DIR)
+    # Get the folder name from base directory
+    folder_name = os.path.basename(CMS_BASE_DIR.rstrip('/')) or os.path.basename(os.path.dirname(CMS_BASE_DIR)) or 'Website'
+    return render_template('index.html', base_dir=CMS_BASE_DIR, folder_name=folder_name)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -151,76 +167,143 @@ def logout():
     return redirect(url_for('login'))
 
 
-def process_html_for_preview(html_content, file_path):
-    """Process HTML content to fix relative paths for preview."""
+def resolve_relative_path(base_path, relative_url):
+    """Resolve relative URL to absolute path within CMS_BASE_DIR."""
     from urllib.parse import urljoin, urlparse
+    import posixpath
+    
+    # Normalize paths to use forward slashes
+    base_path = base_path.replace('\\', '/')
+    relative_url = relative_url.replace('\\', '/')
+    
+    # Get directory of base file
+    base_dir = '/'.join(base_path.split('/')[:-1]) if '/' in base_path else ''
+    
+    # Join relative URL with base directory
+    if relative_url.startswith('/'):
+        # Absolute path from root
+        resolved = relative_url.lstrip('/')
+    elif relative_url.startswith('../'):
+        # Parent directory navigation
+        parts = base_dir.split('/') if base_dir else []
+        rel_parts = relative_url.split('/')
+        
+        for part in rel_parts:
+            if part == '..':
+                if parts:
+                    parts.pop()
+            elif part and part != '.':
+                parts.append(part)
+        
+        resolved = '/'.join(parts)
+    elif relative_url.startswith('./'):
+        # Current directory
+        resolved = (base_dir + '/' + relative_url[2:]) if base_dir else relative_url[2:]
+    else:
+        # Simple relative path
+        resolved = (base_dir + '/' + relative_url) if base_dir else relative_url
+    
+    # Normalize path
+    resolved = posixpath.normpath(resolved).replace('\\', '/')
+    return resolved
+
+
+def process_html_for_preview(html_content, file_path):
+    """Process HTML content to fix relative paths for preview - comprehensive rewrite."""
     import re
+    from urllib.parse import urlparse
     
     # Get the directory of the file for resolving relative paths
     file_dir = '/'.join(file_path.split('/')[:-1]) if '/' in file_path else ''
     
-    # Use base tag to set base URL for all relative paths
-    # This is the simplest and most reliable approach
+    # Convert all relative and absolute paths to use preview-assets endpoint
+    def fix_url_attribute(match):
+        """Fix URLs in HTML attributes (href, src, action, etc.)."""
+        attr_name = match.group(1)  # href, src, etc.
+        quote1 = match.group(2)     # Opening quote
+        url = match.group(3)        # URL
+        quote2 = match.group(4)     # Closing quote
+        
+        # Skip external URLs, data URIs, javascript, anchors, etc.
+        if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', '#', 'mailto:', 'tel:', 'blob:')):
+            return match.group(0)
+        
+        # Skip empty URLs
+        if not url:
+            return match.group(0)
+        
+        # Resolve relative path
+        resolved = resolve_relative_path(file_path, url)
+        new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+        
+        return f'{attr_name}={quote1}{new_url}{quote2}'
+    
+    def fix_css_url(match):
+        """Fix URLs in CSS url() functions."""
+        prefix = match.group(1)  # "url(" part
+        quote1 = match.group(2) or ''  # Optional opening quote
+        url = match.group(3)     # URL
+        quote2 = match.group(4) or ''  # Optional closing quote
+        suffix = match.group(5)  # ")" part
+        
+        # Skip external URLs, data URIs
+        if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
+            return match.group(0)
+        
+        if not url:
+            return match.group(0)
+        
+        # Resolve relative path
+        resolved = resolve_relative_path(file_path, url)
+        new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+        
+        return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+    
+    def fix_style_attribute(match):
+        """Fix URLs inside style attributes."""
+        style_content = match.group(2)
+        
+        # Fix url() inside style
+        style_content = re.sub(
+            r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
+            fix_css_url,
+            style_content,
+            flags=re.IGNORECASE
+        )
+        
+        return f'{match.group(1)}="{style_content}"'
+    
+    # Fix all href, src, action, background, poster, etc.
+    attributes_pattern = r'\b(href|src|action|background|poster|data-src|data-background|data-bg)=(["\'])([^"\']+)(["\'])'
+    html_content = re.sub(attributes_pattern, fix_url_attribute, html_content, flags=re.IGNORECASE)
+    
+    # Fix style attributes (for inline styles with url())
+    html_content = re.sub(r'(style=)(["\'])([^"\']+)(["\'])', fix_style_attribute, html_content, flags=re.IGNORECASE)
+    
+    # Fix CSS url() in <style> tags and external style tags
+    def fix_style_tag(match):
+        style_content = match.group(2)
+        style_content = re.sub(
+            r'(url\s*\(\s*)(["\']?)([^)"\']+)(["\']?\s*)(\))',
+            fix_css_url,
+            style_content,
+            flags=re.IGNORECASE
+        )
+        return f'<style{match.group(1)}>{style_content}</style>'
+    
+    html_content = re.sub(r'<style([^>]*)>([^<]*(?:<[^/][^>]*>[^<]*)*)</style>', fix_style_tag, html_content, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Inject base tag for additional compatibility
     base_url = f'/preview-assets/{file_dir}/' if file_dir else '/preview-assets/'
     base_url = base_url.replace('//', '/')
-    
-    # Inject or update base tag in head
     base_tag = f'<base href="{base_url}">'
     
-    # Try to find and replace existing base tag
-    if re.search(r'<base[^>]*>', html_content, re.IGNORECASE):
-        html_content = re.sub(r'<base[^>]*>', base_tag, html_content, flags=re.IGNORECASE)
-    # If no base tag, try to inject after <head>
-    elif re.search(r'<head[^>]*>', html_content, re.IGNORECASE):
-        html_content = re.sub(r'(<head[^>]*>)', f'\\1\n    {base_tag}', html_content, flags=re.IGNORECASE, count=1)
-    # If no head tag, wrap content
-    elif not re.search(r'<html', html_content, re.IGNORECASE):
-        html_content = f'<html><head>{base_tag}</head><body>{html_content}</body></html>'
-    else:
-        # Has html but no head
-        html_content = re.sub(r'(<html[^>]*>)', f'\\1<head>{base_tag}</head>', html_content, flags=re.IGNORECASE, count=1)
-    
-    # Additionally fix absolute paths that start with / to use preview-assets
-    # This handles cases where base tag might not work perfectly
-    def fix_absolute_paths(match):
-        quote = match.group(1)  # Opening quote
-        url = match.group(2)    # URL
-        quote2 = match.group(3) # Closing quote
-        
-        # Skip external URLs, data URIs, etc.
-        if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', '#', 'mailto:', 'tel:')):
-            return match.group(0)
-        
-        # Fix absolute paths (starting with /)
-        if url.startswith('/'):
-            new_url = f'/preview-assets{url}'
-            return f'{quote}{new_url}{quote2}'
-        
-        # Keep relative paths as-is (base tag will handle them)
-        return match.group(0)
-    
-    # Fix href, src, action, background attributes
-    html_content = re.sub(r'(href=["\'])([^"\']+)(["\'])', fix_absolute_paths, html_content, flags=re.IGNORECASE)
-    html_content = re.sub(r'(src=["\'])([^"\']+)(["\'])', fix_absolute_paths, html_content, flags=re.IGNORECASE)
-    html_content = re.sub(r'(action=["\'])([^"\']+)(["\'])', fix_absolute_paths, html_content, flags=re.IGNORECASE)
-    html_content = re.sub(r'(background=["\'])([^"\']+)(["\'])', fix_absolute_paths, html_content, flags=re.IGNORECASE)
-    
-    # Fix CSS url() references
-    def fix_css_url(match):
-        quote = match.group(1) if match.group(1) else ''
-        url = match.group(2)
-        quote2 = match.group(3) if match.group(3) else ''
-        
-        if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:')):
-            return match.group(0)
-        
-        if url.startswith('/'):
-            new_url = f'/preview-assets{url}'
-            return f'url({quote}{new_url}{quote2})'
-        
-        return match.group(0)
-    
-    html_content = re.sub(r'url\((["\']?)([^)"\']+)(["\']?)\)', fix_css_url, html_content, flags=re.IGNORECASE)
+    # Inject base tag if not present
+    if not re.search(r'<base[^>]*>', html_content, re.IGNORECASE):
+        if re.search(r'<head[^>]*>', html_content, re.IGNORECASE):
+            html_content = re.sub(r'(<head[^>]*>)', f'\\1\n    {base_tag}', html_content, flags=re.IGNORECASE, count=1)
+        elif re.search(r'<html', html_content, re.IGNORECASE):
+            html_content = re.sub(r'(<html[^>]*>)', f'\\1\n<head>{base_tag}</head>', html_content, flags=re.IGNORECASE, count=1)
     
     return html_content
 
@@ -247,18 +330,75 @@ def preview_file(file_path):
     return send_file(full_path)
 
 
+@app.route('/preview-assets/', defaults={'asset_path': ''})
 @app.route('/preview-assets/<path:asset_path>')
 @login_required
 def preview_assets(asset_path):
     """Serve assets for preview (CSS, JS, images, etc.)."""
-    # Remove leading slash if present
-    asset_path = asset_path.lstrip('/')
-    full_path = safe_path(asset_path)
-    if not full_path or not os.path.exists(full_path):
-        abort(404)
+    # Normalize path - remove leading/trailing slashes, but handle empty
+    asset_path = asset_path.strip('/')
     
-    # Determine MIME type
-    mimetype = mimetypes.guess_type(full_path)[0] or 'application/octet-stream'
+    # If empty after strip, it means root request - serve nothing or handle appropriately
+    if not asset_path:
+        abort(404)  # Root preview-assets doesn't make sense
+    
+    full_path = safe_path(asset_path)
+    
+    # If direct path doesn't exist, try common variations
+    if not full_path or not os.path.exists(full_path):
+        # Try without leading slash variations
+        test_paths = [
+            asset_path,
+            asset_path.lstrip('/'),
+            '/' + asset_path.lstrip('/'),
+        ]
+        
+        for test_path in test_paths:
+            test_full = safe_path(test_path.lstrip('/'))
+            if test_full and os.path.exists(test_full):
+                full_path = test_full
+                break
+        
+        # Still not found - try with common extensions
+        if not full_path or not os.path.exists(full_path):
+            for ext in ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot']:
+                test_path = asset_path + ext
+                test_full = safe_path(test_path.lstrip('/'))
+                if test_full and os.path.exists(test_full):
+                    full_path = test_full
+                    break
+        
+        if not full_path or not os.path.exists(full_path):
+            abort(404)
+    
+    # Security: Double-check path is within base directory
+    if not os.path.abspath(full_path).startswith(os.path.abspath(CMS_BASE_DIR)):
+        abort(403)
+    
+    # Determine MIME type with proper charset for text files
+    mimetype = mimetypes.guess_type(full_path)[0]
+    
+    # Set appropriate MIME types for common web assets
+    if full_path.endswith('.css'):
+        mimetype = 'text/css; charset=utf-8'
+    elif full_path.endswith('.js'):
+        mimetype = 'application/javascript; charset=utf-8'
+    elif full_path.endswith('.json'):
+        mimetype = 'application/json; charset=utf-8'
+    elif full_path.endswith('.html') or full_path.endswith('.htm'):
+        mimetype = 'text/html; charset=utf-8'
+    elif full_path.endswith('.woff'):
+        mimetype = 'font/woff'
+    elif full_path.endswith('.woff2'):
+        mimetype = 'font/woff2'
+    elif full_path.endswith('.ttf'):
+        mimetype = 'font/ttf'
+    elif full_path.endswith('.eot'):
+        mimetype = 'application/vnd.ms-fontobject'
+    
+    if not mimetype:
+        mimetype = 'application/octet-stream'
+    
     return send_file(full_path, mimetype=mimetype)
 
 

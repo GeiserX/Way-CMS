@@ -9,7 +9,9 @@ function updateBreadcrumb(path) {
     const breadcrumbEl = document.getElementById('breadcrumb');
     const parts = path.split('/').filter(p => p);
     
-    breadcrumbEl.innerHTML = '<span class="breadcrumb-item" onclick="navigateTo(\'\')">Root</span>';
+    // Get folder name from data attribute or use default
+    const folderName = breadcrumbEl.dataset.folderName || 'Root';
+    breadcrumbEl.innerHTML = `<span class="breadcrumb-item" onclick="navigateTo('')">${escapeHtml(folderName)}</span>`;
     
     let currentPath = '';
     parts.forEach((part, index) => {
@@ -109,18 +111,13 @@ function openFile(path) {
                 previewToggle.textContent = (isHtml && previewEnabled) ? 'Hide Preview' : 'Preview';
             }
             
-            // Load initial preview for HTML files
+            // Load initial preview for HTML files using the preview endpoint
             if (isHtml && previewEnabled) {
-                // Load the file's preview first
-                fetch(`${API_BASE}/preview/${encodeURIComponent(path)}`)
-                    .then(res => res.text())
-                    .then(html => {
-                        const iframe = document.getElementById('preview-iframe');
-                        if (iframe) {
-                            iframe.srcdoc = html;
-                        }
-                    })
-                    .catch(err => console.error('Preview load error:', err));
+                const iframe = document.getElementById('preview-iframe');
+                if (iframe) {
+                    // Use the preview endpoint which processes the file correctly
+                    iframe.src = `/preview/${encodeURIComponent(path)}`;
+                }
             }
             
             // Determine mode based on file extension
@@ -180,12 +177,12 @@ function updatePreview() {
     const previewIframe = document.getElementById('preview-iframe');
     if (!previewIframe) return;
     
-    // Debounce preview updates (wait 500ms after typing stops)
+    // Debounce preview updates (wait 800ms after typing stops for better performance)
     clearTimeout(previewUpdateTimer);
     previewUpdateTimer = setTimeout(() => {
-        // Save current content to a temp file or use API to render
         const content = currentEditor.getValue();
         
+        // Use API to process HTML with proper asset path resolution
         fetch(`${API_BASE}/api/preview-html`, {
             method: 'POST',
             headers: {
@@ -196,20 +193,49 @@ function updatePreview() {
                 file_path: currentFilePath
             })
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            return res.json();
+        })
         .then(data => {
             if (data.html) {
-                // Write to iframe using srcdoc for better base tag support
+                // Use srcdoc - this works better than blob URLs for base tags
                 previewIframe.srcdoc = data.html;
+                
+                // If srcdoc doesn't work well, fallback to blob URL with proper origin
+                setTimeout(() => {
+                    // Check if iframe loaded successfully
+                    try {
+                        const iframeDoc = previewIframe.contentDocument || previewIframe.contentWindow.document;
+                        if (!iframeDoc || iframeDoc.readyState !== 'complete') {
+                            // Fallback: create blob URL with processed HTML
+                            const blob = new Blob([data.html], { type: 'text/html' });
+                            const url = URL.createObjectURL(blob);
+                            const oldSrc = previewIframe.src;
+                            previewIframe.src = url;
+                            if (oldSrc && oldSrc.startsWith('blob:')) {
+                                URL.revokeObjectURL(oldSrc);
+                            }
+                        }
+                    } catch (e) {
+                        // Cross-origin or other error - use blob fallback
+                        const blob = new Blob([data.html], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        previewIframe.src = url;
+                    }
+                }, 100);
             }
         })
         .catch(err => {
             console.error('Preview update error:', err);
-            // Fallback: save file temporarily and reload
-            // For now, just use srcdoc with processed content
-            previewIframe.srcdoc = content;
+            // Ultimate fallback: direct blob
+            const blob = new Blob([content], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            previewIframe.src = url;
         });
-    }, 500);
+    }, 800);
 }
 
 function togglePreview() {
