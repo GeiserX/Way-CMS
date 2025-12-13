@@ -330,6 +330,18 @@ def process_html_for_preview(html_content, file_path):
                     new_url = f'/preview-assets/{resolved}'.replace('//', '/')
                     return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
         
+        # For ANY absolute path starting with /, check if it's a local file first
+        # This ensures images, fonts, and other assets in paths like /images/logo.png
+        # or /templates/fonts/fontawesome.woff2 are correctly identified as local
+        if url.startswith('/'):
+            test_path = url.lstrip('/')
+            test_full_path = safe_path(test_path)
+            if test_full_path and os.path.exists(test_full_path):
+                # This is a local file - convert to preview-assets
+                resolved = resolve_relative_path(file_path, url)
+                new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+        
         # For external CDNs (if not local), preserve them
         external_services = [
             'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
@@ -401,6 +413,18 @@ def process_html_for_preview(html_content, file_path):
                         new_url = f'/preview-assets/{resolved}'.replace('//', '/')
                         return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
             
+            # For ANY absolute path starting with /, check if it's a local file first
+            # This ensures images, fonts, and other assets in paths like /images/logo.png
+            # or /templates/fonts/fontawesome.woff2 are correctly identified as local
+            if url.startswith('/'):
+                test_path = url.lstrip('/')
+                test_full_path = safe_path(test_path)
+                if test_full_path and os.path.exists(test_full_path):
+                    # This is a local file - convert to preview-assets
+                    resolved = resolve_relative_path(file_path, url)
+                    new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                    return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+            
             # For external CDNs (if not local), preserve them
             external_services = [
                 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
@@ -445,6 +469,16 @@ def process_html_for_preview(html_content, file_path):
                             resolved = resolve_relative_path(file_path, url)
                             new_url = f'/preview-assets/{resolved}'.replace('//', '/')
                             return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
+                
+                # For ANY absolute path starting with /, check if it's a local file first
+                if url.startswith('/'):
+                    test_path = url.lstrip('/')
+                    test_full_path = safe_path(test_path)
+                    if test_full_path and os.path.exists(test_full_path):
+                        # This is a local file - convert to preview-assets
+                        resolved = resolve_relative_path(file_path, url)
+                        new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                        return f'{prefix}{url_part}{quote1}{new_url}{quote2}{suffix}'
                 
                 # Resolve path for local files
                 resolved = resolve_relative_path(file_path, url)
