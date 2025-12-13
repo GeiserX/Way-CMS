@@ -186,6 +186,24 @@
     .btn-create:active {
         transform: translateY(0);
     }
+    /* Website link styling */
+    .website-link {
+        color: #007acc;
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .website-link:hover {
+        background: rgba(0, 122, 204, 0.1);
+        color: #0098ff;
+        text-decoration: none;
+    }
     .context-menu a {
         color: var(--text-primary);
         padding: 0.5rem 0.75rem;
@@ -292,7 +310,14 @@
 </div>
 
 <header class="header">
-    <h1 class="logo-title">Way-CMS</h1>
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <h1 class="logo-title">Way-CMS</h1>
+        {% if website_url %}
+        <a href="{{ website_url }}" target="_blank" class="website-link" title="View live website">
+            🌐 Live Website
+        </a>
+        {% endif %}
+    </div>
     <div class="header-actions">
         <!-- Primary visible buttons -->
         <button class="btn btn-secondary" onclick="toggleSearch()">🔍 Search</button>

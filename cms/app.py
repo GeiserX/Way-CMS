@@ -28,6 +28,8 @@ ALLOWED_EXTENSIONS = {'html', 'htm', 'css', 'js', 'txt', 'xml', 'json', 'md', 'p
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 READ_ONLY_MODE = os.environ.get('READ_ONLY_MODE', 'false').lower() == 'true'
 SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '1440'))  # Default 24 hours
+WEBSITE_URL = os.environ.get('WEBSITE_URL', '')  # URL of the live website
+WEBSITE_NAME = os.environ.get('WEBSITE_NAME', '')  # Name of the website (for breadcrumb)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production-' + os.urandom(32).hex())
@@ -166,9 +168,12 @@ def create_backup(file_path):
 @login_required
 def index():
     """Main page showing file browser."""
-    # Get the folder name from base directory
-    folder_name = os.path.basename(CMS_BASE_DIR.rstrip('/')) or os.path.basename(os.path.dirname(CMS_BASE_DIR)) or 'Website'
-    return render_template('index.html', base_dir=CMS_BASE_DIR, folder_name=folder_name)
+    # Get the folder name from environment variable or base directory
+    if WEBSITE_NAME:
+        folder_name = WEBSITE_NAME
+    else:
+        folder_name = os.path.basename(CMS_BASE_DIR.rstrip('/')) or os.path.basename(os.path.dirname(CMS_BASE_DIR)) or 'Website'
+    return render_template('index.html', base_dir=CMS_BASE_DIR, folder_name=folder_name, website_url=WEBSITE_URL)
 
 
 @app.route('/login', methods=['GET', 'POST'])
