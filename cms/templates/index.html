@@ -278,6 +278,10 @@
     .file-item.hidden, .dir-item.hidden {
         display: none !important;
     }
+    .file-item.filter-highlight, .dir-item.filter-highlight {
+        background: rgba(102, 126, 234, 0.2) !important;
+        border-left: 3px solid #667eea;
+    }
 </style>
 {% endblock %}
 
@@ -326,7 +330,7 @@
             <div class="file-browser-actions" style="padding: 0.5rem; border-bottom: 1px solid #3e3e42;">
                 <input type="text" id="file-filter" placeholder="Filter files... (e.g. *.html, *.css)" 
                        style="width: 100%; padding: 0.35rem; margin-bottom: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);"
-                       onkeyup="filterFiles(this.value)">
+                       onkeyup="filterFiles(this.value)" oninput="filterFiles(this.value)">
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn-create" onclick="showCreateFileDialog()" title="Create New File">
                         <span style="font-size: 1.1rem;">➕</span> File
@@ -431,13 +435,40 @@
 
 <!-- Backups Modal -->
 <div id="backups-modal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 800px;">
+    <div class="modal-content" style="max-width: 900px;">
         <div class="modal-header">
-            <h2>Backups: <span id="backups-file-name"></span></h2>
-            <button class="close-btn" onclick="toggleBackups()">&times;</button>
+            <h2>Folder Backups: <span id="backups-folder-name"></span></h2>
+            <button class="close-btn" onclick="closeBackupsModal()" style="font-size: 1.5rem; padding: 0; width: 32px; height: 32px;">&times;</button>
         </div>
         <div class="modal-body">
+            <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-secondary);">Manage backups for the current folder</span>
+                <button class="btn btn-primary" onclick="showCreateBackupDialog()">➕ Create Backup</button>
+            </div>
             <div id="backups-list" style="max-height: 500px; overflow-y: auto;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Backup Dialog -->
+<div id="create-backup-dialog" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Create Folder Backup</h2>
+            <button class="close-btn" onclick="closeCreateBackupDialog()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Backup Name:</label>
+                <input type="text" id="backup-name-input" placeholder="e.g., mybackup (will create mybackup.zip)" value="">
+                <small style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                    This will create a ZIP backup of the entire folder
+                </small>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeCreateBackupDialog()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmCreateBackup()">Create Backup</button>
+            </div>
         </div>
     </div>
 </div>

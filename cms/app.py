@@ -1294,6 +1294,164 @@ def create_manual_backup():
         return jsonify({'error': 'Backup creation failed'}), 500
 
 
+@app.route('/api/folder-backups', methods=['GET'])
+@login_required
+def list_folder_backups():
+    """List all folder backups (ZIP files)."""
+    folder_path = request.args.get('path', '')
+    folder_backup_dir = os.path.join(BACKUP_DIR, 'folders', folder_path if folder_path else 'root')
+    
+    if not os.path.exists(folder_backup_dir):
+        return jsonify({'backups': []})
+    
+    backups = []
+    try:
+        for item in os.listdir(folder_backup_dir):
+            if item.endswith('.zip'):
+                item_path = os.path.join(folder_backup_dir, item)
+                if os.path.isfile(item_path):
+                    stat = os.stat(item_path)
+                    # Extract backup name (without .zip)
+                    backup_name = item[:-4] if item.endswith('.zip') else item
+                    
+                    backups.append({
+                        'name': backup_name,
+                        'filename': item,
+                        'path': item_path.replace(BACKUP_DIR, '').lstrip('/'),
+                        'size': stat.st_size,
+                        'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        'formatted_date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                    })
+        
+        backups.sort(key=lambda x: x['modified'], reverse=True)
+        return jsonify({'backups': backups})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/create-folder-backup', methods=['POST'])
+@login_required
+@read_only_check
+def create_folder_backup():
+    """Create a folder backup (ZIP)."""
+    data = request.json
+    folder_path = data.get('path', '')
+    backup_name = data.get('name', '').strip()
+    
+    if not backup_name:
+        return jsonify({'error': 'Backup name required'}), 400
+    
+    # Sanitize backup name
+    backup_name = re.sub(r'[^a-zA-Z0-9_-]', '_', backup_name)
+    if not backup_name:
+        backup_name = 'backup'
+    
+    full_folder_path = safe_path(folder_path)
+    if not full_folder_path:
+        return jsonify({'error': 'Invalid folder path'}), 400
+    
+    # Create backup directory
+    folder_backup_dir = os.path.join(BACKUP_DIR, 'folders', folder_path if folder_path else 'root')
+    os.makedirs(folder_backup_dir, exist_ok=True)
+    
+    backup_filename = f"{backup_name}.zip"
+    backup_path = os.path.join(folder_backup_dir, backup_filename)
+    
+    try:
+        import zipfile
+        import tempfile
+        
+        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            if os.path.isfile(full_folder_path):
+                # Single file
+                zip_file.write(full_folder_path, os.path.basename(full_folder_path))
+            else:
+                # Directory - walk and add all files
+                for root, dirs, files in os.walk(full_folder_path):
+                    # Skip backup directories
+                    dirs[:] = [d for d in dirs if not d.startswith('.way-cms')]
+                    
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # Relative path within the archive
+                        arcname = os.path.relpath(file_path, full_folder_path)
+                        zip_file.write(file_path, arcname)
+        
+        stat = os.stat(backup_path)
+        return jsonify({
+            'success': True,
+            'backup': {
+                'name': backup_name,
+                'filename': backup_filename,
+                'path': backup_path.replace(BACKUP_DIR, '').lstrip('/'),
+                'size': stat.st_size,
+                'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                'formatted_date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/restore-folder-backup', methods=['POST'])
+@login_required
+@read_only_check
+def restore_folder_backup():
+    """Restore a folder from backup ZIP."""
+    data = request.json
+    folder_path = data.get('path', '')
+    backup_path = data.get('backup_path', '')
+    
+    if not folder_path or not backup_path:
+        return jsonify({'error': 'Both folder path and backup path required'}), 400
+    
+    full_backup_path = os.path.join(BACKUP_DIR, backup_path)
+    if not os.path.abspath(full_backup_path).startswith(os.path.abspath(BACKUP_DIR)):
+        return jsonify({'error': 'Invalid backup path'}), 400
+    
+    if not os.path.exists(full_backup_path):
+        return jsonify({'error': 'Backup not found'}), 404
+    
+    full_folder_path = safe_path(folder_path)
+    if not full_folder_path:
+        return jsonify({'error': 'Invalid folder path'}), 400
+    
+    try:
+        import zipfile
+        
+        # Extract ZIP to folder
+        with zipfile.ZipFile(full_backup_path, 'r') as zip_file:
+            zip_file.extractall(full_folder_path)
+        
+        return jsonify({'success': True, 'message': 'Folder restored successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/delete-folder-backup', methods=['DELETE'])
+@login_required
+@read_only_check
+def delete_folder_backup():
+    """Delete a folder backup."""
+    backup_path = request.args.get('path', '')
+    
+    if not backup_path:
+        return jsonify({'error': 'Backup path required'}), 400
+    
+    full_backup_path = os.path.join(BACKUP_DIR, backup_path)
+    if not os.path.abspath(full_backup_path).startswith(os.path.abspath(BACKUP_DIR)):
+        return jsonify({'error': 'Invalid backup path'}), 400
+    
+    if not os.path.exists(full_backup_path):
+        return jsonify({'error': 'Backup not found'}), 404
+    
+    try:
+        os.remove(full_backup_path)
+        return jsonify({'success': True, 'message': 'Backup deleted successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/download-zip')
 @login_required
 def download_folder_zip():

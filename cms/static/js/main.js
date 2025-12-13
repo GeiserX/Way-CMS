@@ -222,33 +222,29 @@ function useSearchHistory(query) {
     }
 }
 
-// File filtering - searches recursively including in subfolders
-function filterFiles(pattern) {
+// File filtering - searches recursively including in subfolders, auto-expands matches
+async function filterFiles(pattern) {
     const fileList = document.getElementById('fileList');
     if (!fileList) return;
     
     const filterLower = pattern.toLowerCase().trim();
     
-    // Get all items including those in expanded folders
-    const allItems = fileList.querySelectorAll('.file-item, .dir-item');
-    const allFolderContents = fileList.querySelectorAll('.folder-contents');
-    
     if (!filterLower) {
-        // Show all items when filter is empty
-        allItems.forEach(item => item.classList.remove('hidden'));
-        allFolderContents.forEach(fc => {
-            if (expandedFolders.has(fc.id.replace('folder-', '').replace(/_/g, '/'))) {
-                fc.classList.add('expanded');
-            }
+        // Show all items when filter is empty, restore original state
+        document.querySelectorAll('.file-item, .dir-item').forEach(item => {
+            item.classList.remove('hidden', 'filter-highlight');
         });
         return;
     }
     
-    allItems.forEach(item => {
-        // Get the full path for searching
-        const path = item.dataset.path || '';
-        const nameEl = item.querySelector('.file-name') || item.querySelector('.dir-name');
-        const name = nameEl ? nameEl.textContent.toLowerCase() : '';
+    // First, recursively fetch all files to search through
+    const allFiles = await getAllFilesRecursively('');
+    const matchingPaths = new Set();
+    const foldersToExpand = new Set();
+    
+    allFiles.forEach(file => {
+        const path = file.path || '';
+        const name = file.name.toLowerCase();
         const fullPath = path.toLowerCase();
         
         let matches = false;
@@ -261,23 +257,88 @@ function filterFiles(pattern) {
             matches = name.includes(filterLower) || fullPath.includes(filterLower);
         }
         
-        item.classList.toggle('hidden', !matches);
-        
-        // For directories, if they match or have matching children, show them
-        if (item.classList.contains('dir-item') && !matches) {
-            // Check if any child matches - expand folders that might have matches
-            const containerId = 'folder-' + path.replace(/[^a-zA-Z0-9]/g, '_');
-            const container = document.getElementById(containerId);
-            if (container) {
-                const hasVisibleChildren = container.querySelector('.file-item:not(.hidden), .dir-item:not(.hidden)');
-                if (hasVisibleChildren) {
-                    item.classList.remove('hidden');
-                    container.classList.add('expanded');
-                    item.classList.add('expanded');
-                }
+        if (matches) {
+            matchingPaths.add(path);
+            // Add parent folders to expand list
+            const parts = path.split('/');
+            for (let i = 1; i < parts.length; i++) {
+                foldersToExpand.add(parts.slice(0, i).join('/'));
             }
         }
     });
+    
+    // Expand all folders that contain matches
+    for (const folderPath of foldersToExpand) {
+        if (!expandedFolders.has(folderPath)) {
+            const containerId = 'folder-' + folderPath.replace(/[^a-zA-Z0-9]/g, '_');
+            const container = document.getElementById(containerId);
+            if (container) {
+                const dirItem = container.previousElementSibling;
+                if (dirItem && dirItem.classList.contains('dir-item')) {
+                    expandedFolders.add(folderPath);
+                    container.classList.add('expanded');
+                    dirItem.classList.add('expanded');
+                    const toggle = dirItem.querySelector('.folder-toggle');
+                    if (toggle) {
+                        container.innerHTML = '<div class="loading" style="padding: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">Loading...</div>';
+                        loadFiles(folderPath, container);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Wait a bit for folders to load, then highlight matches
+    setTimeout(() => {
+        document.querySelectorAll('.file-item, .dir-item').forEach(item => {
+            const path = item.dataset.path || '';
+            if (matchingPaths.has(path)) {
+                item.classList.remove('hidden');
+                item.classList.add('filter-highlight');
+            } else {
+                item.classList.remove('filter-highlight');
+                // Hide if not matching and not a parent of a match
+                const isParentOfMatch = Array.from(matchingPaths).some(matchPath => 
+                    matchPath.startsWith(path + '/')
+                );
+                item.classList.toggle('hidden', !isParentOfMatch);
+            }
+        });
+    }, 300);
+}
+
+// Helper function to recursively get all files
+async function getAllFilesRecursively(path) {
+    const files = [];
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/files?path=${encodeURIComponent(path)}`);
+        const data = await response.json();
+        
+        // Add files in current directory
+        data.files.forEach(file => {
+            files.push({
+                name: file.name,
+                path: file.path,
+                isDirectory: false
+            });
+        });
+        
+        // Recursively get files in subdirectories
+        for (const dir of data.directories) {
+            files.push({
+                name: dir.name,
+                path: dir.path,
+                isDirectory: true
+            });
+            const subFiles = await getAllFilesRecursively(dir.path);
+            files.push(...subFiles);
+        }
+    } catch (err) {
+        console.error('Error fetching files recursively:', err);
+    }
+    
+    return files;
 }
 
 // Progress indicator functions
@@ -1466,20 +1527,24 @@ function createBackup() {
 }
 
 function toggleBackups() {
-    const filePath = currentFilePath || prompt('Enter file path to view backups:');
-    if (!filePath) return;
+    const folderPath = currentPath || '';
+    const folderName = folderPath || 'Root';
     
-    document.getElementById('backups-file-name').textContent = filePath;
+    document.getElementById('backups-folder-name').textContent = folderName;
     document.getElementById('backups-modal').style.display = 'flex';
     
-    loadBackups(filePath);
+    loadFolderBackups(folderPath);
 }
 
-function loadBackups(filePath) {
+function closeBackupsModal() {
+    document.getElementById('backups-modal').style.display = 'none';
+}
+
+function loadFolderBackups(folderPath) {
     const backupsList = document.getElementById('backups-list');
     backupsList.innerHTML = '<div class="loading">Loading backups...</div>';
     
-    fetch(`${API_BASE}/api/backups?path=${encodeURIComponent(filePath)}`)
+    fetch(`${API_BASE}/api/folder-backups?path=${encodeURIComponent(folderPath)}`)
         .then(res => res.json())
         .then(data => {
             if (data.error) {
@@ -1488,7 +1553,7 @@ function loadBackups(filePath) {
             }
             
             if (data.backups.length === 0) {
-                backupsList.innerHTML = '<div class="loading">No backups found</div>';
+                backupsList.innerHTML = '<div class="loading" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No backups found. Create one using the button above.</div>';
                 return;
             }
             
@@ -1497,15 +1562,19 @@ function loadBackups(filePath) {
                 const item = document.createElement('div');
                 item.className = 'search-result-item';
                 item.style.marginBottom = '1rem';
+                item.style.padding = '1rem';
+                const fileSize = formatFileSize(backup.size);
                 item.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div class="file-path">${backup.timestamp || backup.filename}</div>
-                            <div style="font-size: 0.75rem; color: #999;">${backup.modified} - ${(backup.size / 1024).toFixed(1)} KB</div>
+                        <div style="flex: 1;">
+                            <div class="file-path" style="font-weight: 600; margin-bottom: 0.25rem;">📦 ${escapeHtml(backup.name)}.zip</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                                Created: ${escapeHtml(backup.formatted_date)} • Size: ${fileSize}
+                            </div>
                         </div>
                         <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-secondary" onclick="viewBackup('${backup.path.replace(/'/g, "\\'")}')">View</button>
-                            <button class="btn btn-primary" onclick="restoreBackup('${filePath.replace(/'/g, "\\'")}', '${backup.path.replace(/'/g, "\\'")}')">Restore</button>
+                            <button class="btn btn-primary" onclick="restoreFolderBackup('${folderPath.replace(/'/g, "\\'")}', '${backup.path.replace(/'/g, "\\'")}', '${backup.name.replace(/'/g, "\\'")}')">Restore</button>
+                            <button class="btn btn-danger" onclick="deleteFolderBackup('${backup.path.replace(/'/g, "\\'")}', '${backup.name.replace(/'/g, "\\'")}')">Delete</button>
                         </div>
                     </div>
                 `;
@@ -1515,6 +1584,109 @@ function loadBackups(filePath) {
         .catch(err => {
             backupsList.innerHTML = `<div class="loading" style="color: #f44336;">Error: ${err.message}</div>`;
         });
+}
+
+function showCreateBackupDialog() {
+    document.getElementById('backup-name-input').value = '';
+    document.getElementById('create-backup-dialog').style.display = 'flex';
+    document.getElementById('backup-name-input').focus();
+}
+
+function closeCreateBackupDialog() {
+    document.getElementById('create-backup-dialog').style.display = 'none';
+}
+
+function confirmCreateBackup() {
+    const backupName = document.getElementById('backup-name-input').value.trim();
+    const folderPath = currentPath || '';
+    
+    if (!backupName) {
+        alert('Please enter a backup name');
+        return;
+    }
+    
+    showProgress(30);
+    
+    fetch(`${API_BASE}/api/create-folder-backup`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            path: folderPath,
+            name: backupName
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        hideProgress();
+        if (data.error) {
+            alert('Error creating backup: ' + data.error);
+        } else {
+            showToast('Backup created successfully!');
+            closeCreateBackupDialog();
+            loadFolderBackups(folderPath);
+        }
+    })
+    .catch(err => {
+        hideProgress();
+        alert('Error: ' + err.message);
+    });
+}
+
+function restoreFolderBackup(folderPath, backupPath, backupName) {
+    if (!confirm(`⚠️ Restore folder from backup "${backupName}"?\n\nThis will REPLACE all files in the current folder with the backup contents. This action cannot be undone!`)) {
+        return;
+    }
+    
+    showProgress(50);
+    
+    fetch(`${API_BASE}/api/restore-folder-backup`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            path: folderPath,
+            backup_path: backupPath
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        hideProgress();
+        if (data.error) {
+            alert('Error restoring backup: ' + data.error);
+        } else {
+            showToast('Folder restored successfully!');
+            loadFiles(folderPath);
+        }
+    })
+    .catch(err => {
+        hideProgress();
+        alert('Error: ' + err.message);
+    });
+}
+
+function deleteFolderBackup(backupPath, backupName) {
+    if (!confirm(`Are you sure you want to delete backup "${backupName}"?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    fetch(`${API_BASE}/api/delete-folder-backup?path=${encodeURIComponent(backupPath)}`, {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error deleting backup: ' + data.error);
+        } else {
+            showToast('Backup deleted successfully!');
+            loadFolderBackups(currentPath || '');
+        }
+    })
+    .catch(err => {
+        alert('Error: ' + err.message);
+    });
 }
 
 function viewBackup(backupPath) {
@@ -1665,6 +1837,16 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmRename();
         }
     });
+    
+    // Handle Enter key in create backup dialog
+    const backupNameInput = document.getElementById('backup-name-input');
+    if (backupNameInput) {
+        backupNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                confirmCreateBackup();
+            }
+        });
+    }
     
     // Handle Escape to close modals
     document.addEventListener('keydown', (e) => {
