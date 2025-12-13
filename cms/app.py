@@ -253,21 +253,32 @@ def process_html_for_preview(html_content, file_path):
         # Check if this is a local file with domain structure (like Wayback-Archive does)
         # Paths like /fonts.googleapis.com/css-abc123.css are LOCAL files, not external URLs
         # They should be served through preview-assets
+        # ALWAYS check for local files first before treating as external
         local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
-        is_local_domain_file = False
         for domain_path in local_domain_paths:
             if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
                 # Check if this file exists locally
                 test_path = url.lstrip('/')
                 test_full_path = safe_path(test_path)
                 if test_full_path and os.path.exists(test_full_path):
-                    is_local_domain_file = True
                     # This is a local file - resolve it properly
                     resolved = resolve_relative_path(file_path, url)
                     new_url = f'/preview-assets/{resolved}'.replace('//', '/')
                     if not quote1 and not quote2:
                         quote1 = quote2 = '"'
                     return f'{attr_name}={quote1}{new_url}{quote2}'
+        
+        # For ANY absolute path starting with /, check if it's a local file first
+        if url.startswith('/'):
+            test_path = url.lstrip('/')
+            test_full_path = safe_path(test_path)
+            if test_full_path and os.path.exists(test_full_path):
+                # This is a local file - convert to preview-assets
+                resolved = resolve_relative_path(file_path, url)
+                new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                if not quote1 and not quote2:
+                    quote1 = quote2 = '"'
+                return f'{attr_name}={quote1}{new_url}{quote2}'
         
         # For truly external CDN URLs (if they don't exist locally), preserve them
         external_services = [
