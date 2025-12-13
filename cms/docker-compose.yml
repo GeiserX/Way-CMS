@@ -7,8 +7,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./html:/var/www/html
-      - cms_data:/var/www/html
+      - ../../clvreformas-1-1-5:/var/www/html:ro
     environment:
       - CMS_BASE_DIR=/var/www/html
       - CMS_PASSWORD=${CMS_PASSWORD:-}
@@ -16,6 +15,3 @@ services:
       - PORT=5000
       - DEBUG=false
     restart: unless-stopped
-
-volumes:
-  cms_data:
