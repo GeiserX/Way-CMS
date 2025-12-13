@@ -220,21 +220,26 @@ def process_html_for_preview(html_content, file_path):
     def fix_url_attribute(match):
         """Fix URLs in HTML attributes (href, src, action, etc.)."""
         attr_name = match.group(1)  # href, src, etc.
-        quote1 = match.group(2)     # Opening quote
+        quote1 = match.group(2) or ''     # Opening quote (can be empty for unquoted)
         url = match.group(3)        # URL
-        quote2 = match.group(4)     # Closing quote
+        quote2 = match.group(4) or ''     # Closing quote (can be empty for unquoted)
         
         # Skip external URLs, data URIs, javascript, anchors, etc.
         if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', '#', 'mailto:', 'tel:', 'blob:')):
             return match.group(0)
         
         # Skip empty URLs
-        if not url.strip():
+        if not url or not url.strip():
             return match.group(0)
         
         # Resolve relative path - handles both absolute (/) and relative paths
         resolved = resolve_relative_path(file_path, url)
         new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+        
+        # If original was unquoted, keep it unquoted (but safer to quote it)
+        # For better compatibility, always quote
+        if not quote1 and not quote2:
+            quote1 = quote2 = '"'
         
         return f'{attr_name}={quote1}{new_url}{quote2}'
     
@@ -274,7 +279,8 @@ def process_html_for_preview(html_content, file_path):
         return f'{match.group(1)}="{style_content}"'
     
     # Fix all href, src, action, background, poster, etc.
-    attributes_pattern = r'\b(href|src|action|background|poster|data-src|data-background|data-bg)=(["\'])([^"\']+)(["\'])'
+    # Handle both quoted and unquoted attributes (common in minified HTML)
+    attributes_pattern = r'\b(href|src|action|background|poster|data-src|data-background|data-bg)\s*=\s*(["\']?)([^\s>"\']+)(["\']?)'
     html_content = re.sub(attributes_pattern, fix_url_attribute, html_content, flags=re.IGNORECASE)
     
     # Fix style attributes (for inline styles with url())
