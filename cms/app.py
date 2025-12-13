@@ -1913,17 +1913,35 @@ def schedule_daily_backup():
     print("Automatic backup scheduler started")
 
 # Initialize automatic backups on startup
-if AUTO_BACKUP_ENABLED:
-    # Create initial backup on startup
-    try:
-        print("Creating initial automatic backup...")
-        create_automatic_backup()
-        manage_backup_retention()
-    except Exception as e:
-        print(f"Warning: Could not create initial backup: {e}")
+# Only initialize once (important for Gunicorn with multiple workers)
+_backup_initialized = False
+
+def initialize_automatic_backups():
+    """Initialize automatic backup system (call once on app startup)."""
+    global _backup_initialized
+    if _backup_initialized or not AUTO_BACKUP_ENABLED:
+        return
+    
+    _backup_initialized = True
+    
+    # Create initial backup on startup (delay slightly to allow app to fully initialize)
+    def create_startup_backup():
+        try:
+            print("Creating initial automatic backup...")
+            create_automatic_backup()
+            manage_backup_retention()
+        except Exception as e:
+            print(f"Warning: Could not create initial backup: {e}")
+    
+    # Delay startup backup by 10 seconds to allow app to initialize
+    startup_thread = threading.Thread(target=lambda: (time.sleep(10), create_startup_backup()), daemon=True)
+    startup_thread.start()
     
     # Start daily backup scheduler
     schedule_daily_backup()
+
+# Initialize backups when app is created
+initialize_automatic_backups()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
