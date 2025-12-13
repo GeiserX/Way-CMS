@@ -91,93 +91,69 @@ function syncHeaderOverflow() {
     
     if (!main || !overflowList || !header || !headerActions) return;
 
-    // Reset overflow state - show all buttons first
+    // Clear overflow menu
     overflowList.innerHTML = '';
     if (overflowDivider) overflowDivider.style.display = 'none';
 
-    const overflowableButtons = Array.from(main.querySelectorAll('.header-action-btn.is-overflowable'));
-    const pinnedButtons = Array.from(main.querySelectorAll('.header-action-btn.is-pinned'));
-    const allButtons = [...pinnedButtons, ...overflowableButtons];
+    const allButtons = Array.from(main.querySelectorAll('.header-action-btn'));
     
-    // Reset all buttons to visible
+    // Reset all buttons to visible first
     allButtons.forEach((btn) => btn.classList.remove('is-overflowed'));
     
-    // Hide overflow button initially to measure without it
-    if (overflowBtn) overflowBtn.style.display = 'none';
+    // Always show overflow button to measure it
+    if (overflowBtn) overflowBtn.style.display = '';
 
-    // Force layout settle to get accurate measurements
+    // Force layout
     void header.offsetWidth;
-    void main.offsetWidth;
 
-    // Measure on the actions container to avoid over-subtracting
-    const actionsRect = headerActions.getBoundingClientRect();
-    const gap = 8; // gap between elements (0.5rem = 8px)
+    // Get measurements
+    const headerRect = header.getBoundingClientRect();
+    const logoContainer = header.querySelector('div:first-child');
+    const logoWidth = logoContainer ? logoContainer.getBoundingClientRect().width : 150;
+    const overflowBtnWidth = overflowBtn ? overflowBtn.getBoundingClientRect().width : 80;
+    const gap = 8;
+    const padding = 48; // 1.5rem * 2
+    
+    // Available space for buttons (excluding logo, overflow btn, padding, gaps)
+    const availableWidth = headerRect.width - logoWidth - overflowBtnWidth - padding - (gap * 2);
     
     // Measure all button widths
-    let totalButtonsWidth = 0;
+    let totalWidth = 0;
     const buttonWidths = [];
     allButtons.forEach(btn => {
-        const rect = btn.getBoundingClientRect();
-        const width = rect.width;
+        const width = btn.getBoundingClientRect().width;
         buttonWidths.push({ btn, width });
-        totalButtonsWidth += width + gap; // Add gap after each button (except last)
+        totalWidth += width + gap;
     });
+    if (buttonWidths.length > 0) totalWidth -= gap; // Remove last gap
     
-    // Subtract last gap (no gap after last button)
-    if (buttonWidths.length > 0) {
-        totalButtonsWidth -= gap;
-    }
-    
-    // Available width is the width of the actions container
-    const availableWidthWithoutOverflow = actionsRect.width;
-    
-    // First check: do all buttons fit without overflow button?
-    if (totalButtonsWidth <= availableWidthWithoutOverflow) {
-        // All buttons fit! Hide overflow button and show all buttons
-        if (overflowBtn) {
-            overflowBtn.style.display = 'none';
-        }
+    // If all buttons fit, hide overflow button
+    if (totalWidth <= availableWidth) {
+        if (overflowBtn) overflowBtn.style.display = 'none';
         return;
     }
     
-    // Buttons don't all fit - we need the overflow button
-    const overflowBtnWidth = overflowBtn ? (overflowBtn.getBoundingClientRect().width || 80) + gap : 80 + gap;
-    const availableWidthWithOverflow = actionsRect.width - overflowBtnWidth;
-    
-    // Now calculate what fits: pinned buttons always show, then fit overflowable from left
+    // Need to overflow some buttons - keep overflow button visible
     let currentWidth = 0;
-    
-    // Add pinned buttons first (none currently, but keep logic)
-    pinnedButtons.forEach((btn) => {
-        const item = buttonWidths.find(b => b.btn === btn);
-        if (item) currentWidth += item.width + gap;
-    });
-    if (pinnedButtons.length > 0 && overflowableButtons.length > 0) currentWidth -= gap;
-
-    // Show overflow button since we need it
-    if (overflowBtn) overflowBtn.style.display = '';
-    
-    // Now fit overflowable buttons from left to right
     let overflowCount = 0;
+    
     for (const item of buttonWidths) {
-        if (!overflowableButtons.includes(item.btn)) continue; // Skip pinned buttons
-        
         const btnWidth = item.width + gap;
         
-        if (currentWidth + btnWidth <= availableWidthWithOverflow) {
-            // Button fits, keep it visible
+        if (currentWidth + btnWidth <= availableWidth) {
             currentWidth += btnWidth;
         } else {
-            // Button doesn't fit, move to overflow
+            // Move to overflow
             item.btn.classList.add('is-overflowed');
-            overflowList.prepend(buildOverflowMenuItemForButton(item.btn));
+            overflowList.appendChild(buildOverflowMenuItemForButton(item.btn));
             overflowCount++;
         }
     }
 
-    // Show divider only if there are overflow items
-    if (overflowDivider) overflowDivider.style.display = overflowCount > 0 ? 'block' : 'none';
-    if (overflowCount === 0 && overflowBtn) overflowBtn.style.display = 'none';
+    // Show divider if we have overflow items
+    if (overflowDivider && overflowCount > 0) {
+        overflowDivider.style.display = 'block';
+    }
 }
 
 // Close dropdown when clicking outside

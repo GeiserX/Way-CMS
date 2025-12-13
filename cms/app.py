@@ -1522,28 +1522,6 @@ def download_folder_zip():
     try:
         import zipfile
         import tempfile
-        import io
-        
-        # Create a BytesIO buffer for the ZIP
-        zip_buffer = io.BytesIO()
-        
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            if os.path.isfile(full_path):
-                # Single file
-                zip_file.write(full_path, os.path.basename(full_path))
-            else:
-                # Directory - walk and add all files
-                for root, dirs, files in os.walk(full_path):
-                    # Skip backup directories
-                    dirs[:] = [d for d in dirs if not d.startswith('.way-cms')]
-                    
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        # Calculate relative path from base directory
-                        arcname = os.path.relpath(file_path, CMS_BASE_DIR)
-                        zip_file.write(file_path, arcname)
-        
-        zip_buffer.seek(0)
         
         # Determine filename - use WEBSITE_NAME if available
         if path:
@@ -1551,14 +1529,51 @@ def download_folder_zip():
         else:
             zip_filename = f"{get_website_name_for_backup()}.zip"
         
-        # Reset pointer and stream the file
-        zip_buffer.seek(0)
-        return send_file(
-            zip_buffer,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=zip_filename
-        )
+        # Create temp file for the ZIP (avoids BytesIO hanging issues)
+        fd, tmp_path = tempfile.mkstemp(suffix='.zip')
+        os.close(fd)
+        
+        try:
+            with zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                if os.path.isfile(full_path):
+                    # Single file
+                    zip_file.write(full_path, os.path.basename(full_path))
+                else:
+                    # Directory - walk and add all files
+                    for root, dirs, files in os.walk(full_path):
+                        # Skip backup directories
+                        dirs[:] = [d for d in dirs if not d.startswith('.way-cms')]
+                        
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            # Calculate relative path from base directory
+                            arcname = os.path.relpath(file_path, CMS_BASE_DIR)
+                            zip_file.write(file_path, arcname)
+            
+            # Send the file and delete after
+            response = send_file(
+                tmp_path,
+                mimetype='application/zip',
+                as_attachment=True,
+                download_name=zip_filename
+            )
+            
+            # Schedule cleanup after response is sent
+            @response.call_on_close
+            def cleanup():
+                try:
+                    os.unlink(tmp_path)
+                except:
+                    pass
+            
+            return response
+        except Exception as e:
+            # Clean up on error
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+            raise e
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

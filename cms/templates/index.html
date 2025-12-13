@@ -295,8 +295,8 @@
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showUploadFileDialog()" data-overflow-key="upload-file" data-overflow-label="📁 Upload File">📁 Upload File</button>
         </div>
 
-        <div class="menu-dropdown header-overflow" id="header-overflow">
-            <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu(event)" id="header-menu-toggle" aria-haspopup="true" aria-expanded="false">☰ More</button>
+        <div class="menu-dropdown header-overflow" id="header-overflow" style="display: flex;">
+            <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu(event)" id="header-menu-toggle" aria-haspopup="true" aria-expanded="false">☰</button>
             <div class="menu-dropdown-content" id="header-menu-dropdown" role="menu" aria-labelledby="header-menu-toggle">
                 <div id="header-menu-overflow-items"></div>
                 <div class="menu-divider" id="header-menu-overflow-divider" style="display:none;"></div>
