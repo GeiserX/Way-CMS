@@ -21,6 +21,8 @@ services:
     container_name: way-cms-admin
     ports:
       - "5001:5000"
+    # Override CMD for development - use Flask dev server
+    command: python app.py
     volumes:
       - ${WEBSITE_DIR:-./website}:/var/www/html:rw
       - ./.way-cms-backups:/.way-cms-backups
