@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/foldgutter.min.css">
 <style>
     .CodeMirror {
         height: calc(100vh - 200px);
@@ -82,10 +83,55 @@
         background: white;
         box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
     }
+    /* Search history items */
+    .search-history-item {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        margin: 0.15rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        transition: all 0.2s;
+    }
+    .search-history-item:hover {
+        background: var(--accent-color);
+        color: white;
+    }
+    /* Progress indicator */
+    .progress-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: transparent;
+        z-index: 10000;
+        display: none;
+    }
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+    .progress-container.active {
+        display: block;
+    }
+    /* File filter highlight */
+    .file-item.hidden, .dir-item.hidden {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Progress indicator -->
+<div id="progress-container" class="progress-container">
+    <div id="progress-bar" class="progress-bar"></div>
+</div>
+
 <header class="header">
     <h1 class="logo-title">Way-CMS</h1>
     <div class="header-actions">
@@ -97,6 +143,8 @@
         <button class="btn btn-secondary" onclick="toggleBackups()">💾 Backups</button>
         <button class="btn btn-secondary" onclick="toggleTheme()" id="theme-toggle" title="Toggle Dark/Light Theme">🌓 Theme</button>
         <button class="btn btn-secondary" onclick="showKeyboardShortcuts()" title="Keyboard Shortcuts">⌨️ Shortcuts</button>
+        <button class="btn btn-secondary" onclick="exportSettings()" title="Export Settings">📤 Export</button>
+        <button class="btn btn-secondary" onclick="importSettings()" title="Import Settings">📥 Import</button>
         <button class="btn btn-secondary" onclick="refreshFiles()">🔄 Refresh</button>
         <a href="{{ url_for('logout') }}" class="btn btn-secondary">🚪 Logout</a>
     </div>
@@ -109,6 +157,9 @@
                 <span class="breadcrumb-item" onclick="navigateTo('')">{{ folder_name }}</span>
             </div>
             <div class="file-browser-actions" style="padding: 0.5rem; border-bottom: 1px solid #3e3e42;">
+                <input type="text" id="file-filter" placeholder="Filter files... (e.g. *.html, *.css)" 
+                       style="width: 100%; padding: 0.35rem; margin-bottom: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);"
+                       onkeyup="filterFiles(this.value)">
                 <button class="btn btn-primary" onclick="showCreateFileDialog()" style="width: 100%; margin-bottom: 0.25rem; padding: 0.25rem;">New File</button>
                 <button class="btn btn-primary" onclick="showCreateFolderDialog()" style="width: 100%; padding: 0.25rem;">New Folder</button>
             </div>
@@ -196,6 +247,9 @@
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-primary" onclick="performGlobalSearch()">Search</button>
                 <button class="btn btn-primary" onclick="performGlobalReplace()">Replace All</button>
+            </div>
+            <div id="search-history" class="search-history" style="margin-top: 0.75rem; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px; font-size: 0.8rem;">
+                <strong style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Recent Searches:</strong>
             </div>
             <div id="global-results" class="search-results" style="max-height: 400px; overflow-y: auto; margin-top: 1rem;"></div>
         </div>
@@ -353,6 +407,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/search.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/searchcursor.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.js"></script>
+<!-- Code folding addons -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/brace-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/xml-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/comment-fold.min.js"></script>
+<!-- Selection and editing addons -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closetag.min.js"></script>
 <script>
     const API_BASE = '';
     let currentEditor = null;

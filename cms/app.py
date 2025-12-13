@@ -545,6 +545,25 @@ def process_html_for_preview(html_content, file_path):
     # Match style tags - including multiline content
     html_content = re.sub(r'<style([^>]*)>((?:[^<]|<(?!/style>))*?)</style>', fix_style_tag, html_content, flags=re.IGNORECASE | re.DOTALL)
     
+    # Final catch-all pass: fix any remaining url(//...) patterns that might have been missed
+    # This handles edge cases where style tags weren't properly matched
+    def fix_remaining_url(m):
+        prefix = m.group(1)
+        quote1 = m.group(2) or ''
+        url = m.group(3)
+        quote2 = m.group(4) or ''
+        suffix = m.group(5)
+        
+        if url.startswith('//'):
+            test_path = url.lstrip('/')
+            test_full_path = safe_path(test_path)
+            if test_full_path and os.path.exists(test_full_path):
+                new_url = f'/preview-assets/{test_path}'.replace('//', '/')
+                return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+        return m.group(0)
+    
+    html_content = re.sub(r'(url\s*\(\s*)(["\']?)(//[^)"\']+)(["\']?\s*)(\))', fix_remaining_url, html_content, flags=re.IGNORECASE)
+    
     # For iframe srcdoc to work properly, we need absolute URLs or a proper base tag
     # Get the current request host to make absolute URLs
     from flask import request

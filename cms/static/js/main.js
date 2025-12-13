@@ -1,3 +1,271 @@
+// Utility function to format file sizes
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// File statistics display
+function updateFileStats() {
+    if (!currentEditor) return;
+    const content = currentEditor.getValue();
+    const lines = currentEditor.lineCount();
+    const chars = content.length;
+    const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+    
+    // Update or create stats display
+    let statsEl = document.getElementById('file-stats');
+    if (!statsEl) {
+        statsEl = document.createElement('span');
+        statsEl.id = 'file-stats';
+        statsEl.style.cssText = 'margin-left: 1rem; color: var(--text-secondary); font-size: 0.8rem;';
+        const statusEl = document.getElementById('file-status');
+        if (statusEl && statusEl.parentNode) {
+            statusEl.parentNode.appendChild(statsEl);
+        }
+    }
+    statsEl.textContent = `${lines} lines | ${words} words | ${formatFileSize(chars)}`;
+}
+
+// Search history management
+const MAX_SEARCH_HISTORY = 10;
+
+function getSearchHistory() {
+    try {
+        return JSON.parse(localStorage.getItem('waycms_search_history') || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function addToSearchHistory(query) {
+    if (!query || !query.trim()) return;
+    let history = getSearchHistory();
+    // Remove if already exists
+    history = history.filter(h => h !== query);
+    // Add to front
+    history.unshift(query);
+    // Keep max items
+    history = history.slice(0, MAX_SEARCH_HISTORY);
+    localStorage.setItem('waycms_search_history', JSON.stringify(history));
+    updateSearchHistoryUI();
+}
+
+function updateSearchHistoryUI() {
+    const historyEl = document.getElementById('search-history');
+    if (!historyEl) return;
+    
+    const history = getSearchHistory();
+    if (history.length === 0) {
+        historyEl.innerHTML = '<span style="color: var(--text-secondary);">No recent searches</span>';
+        return;
+    }
+    
+    historyEl.innerHTML = history.map(h => 
+        `<span class="search-history-item" onclick="useSearchHistory('${escapeHtml(h).replace(/'/g, "\\'")}')">${escapeHtml(h)}</span>`
+    ).join('');
+}
+
+function useSearchHistory(query) {
+    const searchInput = document.getElementById('global-search-input');
+    if (searchInput) {
+        searchInput.value = query;
+    }
+}
+
+// File filtering
+function filterFiles(pattern) {
+    const fileList = document.getElementById('fileList');
+    if (!fileList) return;
+    
+    const items = fileList.querySelectorAll('.file-item, .dir-item');
+    const filterLower = pattern.toLowerCase().trim();
+    
+    items.forEach(item => {
+        const nameEl = item.querySelector('.file-name') || item.querySelector('span:nth-child(2)');
+        if (!nameEl) return;
+        
+        const name = nameEl.textContent.toLowerCase();
+        
+        // Handle glob patterns like *.html
+        if (filterLower.includes('*')) {
+            const regex = new RegExp('^' + filterLower.replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
+            item.classList.toggle('hidden', !regex.test(name));
+        } else {
+            item.classList.toggle('hidden', !name.includes(filterLower));
+        }
+    });
+}
+
+// Progress indicator functions
+function showProgress(percent) {
+    const container = document.getElementById('progress-container');
+    const bar = document.getElementById('progress-bar');
+    if (container && bar) {
+        container.classList.add('active');
+        bar.style.width = Math.min(100, percent) + '%';
+    }
+}
+
+function hideProgress() {
+    const container = document.getElementById('progress-container');
+    const bar = document.getElementById('progress-bar');
+    if (container && bar) {
+        bar.style.width = '100%';
+        setTimeout(() => {
+            container.classList.remove('active');
+            bar.style.width = '0%';
+        }, 300);
+    }
+}
+
+// Undo/Redo history (file-level)
+const MAX_UNDO_HISTORY = 50;
+let fileUndoHistory = {}; // { filePath: [{ content, timestamp }] }
+let fileRedoHistory = {}; // { filePath: [{ content, timestamp }] }
+
+function saveToUndoHistory(filePath, content) {
+    if (!fileUndoHistory[filePath]) {
+        fileUndoHistory[filePath] = [];
+    }
+    fileUndoHistory[filePath].push({
+        content: content,
+        timestamp: Date.now()
+    });
+    // Keep max items
+    if (fileUndoHistory[filePath].length > MAX_UNDO_HISTORY) {
+        fileUndoHistory[filePath].shift();
+    }
+    // Clear redo when new change is made
+    fileRedoHistory[filePath] = [];
+}
+
+function undoFile() {
+    if (!currentFilePath || !currentEditor) return;
+    
+    const history = fileUndoHistory[currentFilePath];
+    if (!history || history.length === 0) {
+        showToast('Nothing to undo');
+        return;
+    }
+    
+    // Save current state to redo
+    if (!fileRedoHistory[currentFilePath]) {
+        fileRedoHistory[currentFilePath] = [];
+    }
+    fileRedoHistory[currentFilePath].push({
+        content: currentEditor.getValue(),
+        timestamp: Date.now()
+    });
+    
+    // Restore previous state
+    const prev = history.pop();
+    currentEditor.setValue(prev.content);
+    showToast('Undone');
+}
+
+function redoFile() {
+    if (!currentFilePath || !currentEditor) return;
+    
+    const history = fileRedoHistory[currentFilePath];
+    if (!history || history.length === 0) {
+        showToast('Nothing to redo');
+        return;
+    }
+    
+    // Save current state to undo
+    if (!fileUndoHistory[currentFilePath]) {
+        fileUndoHistory[currentFilePath] = [];
+    }
+    fileUndoHistory[currentFilePath].push({
+        content: currentEditor.getValue(),
+        timestamp: Date.now()
+    });
+    
+    // Restore next state
+    const next = history.pop();
+    currentEditor.setValue(next.content);
+    showToast('Redone');
+}
+
+// Toast notification helper
+function showToast(message) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #333; color: white; padding: 0.75rem 1.5rem; border-radius: 4px; z-index: 10000; transition: opacity 0.3s;';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    setTimeout(() => {
+        toast.style.opacity = '0';
+    }, 2000);
+}
+
+// Export/Import settings
+function exportSettings() {
+    const settings = {
+        theme: document.body.getAttribute('data-theme') || 'dark',
+        searchHistory: getSearchHistory(),
+        previewEnabled: previewEnabled,
+        exportedAt: new Date().toISOString(),
+        version: '1.2.0'
+    };
+    
+    const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'way-cms-settings.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Settings exported');
+}
+
+function importSettings() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const settings = JSON.parse(e.target.result);
+                
+                // Apply theme
+                if (settings.theme) {
+                    document.body.setAttribute('data-theme', settings.theme);
+                    localStorage.setItem('waycms_theme', settings.theme);
+                }
+                
+                // Import search history
+                if (settings.searchHistory && Array.isArray(settings.searchHistory)) {
+                    localStorage.setItem('waycms_search_history', JSON.stringify(settings.searchHistory));
+                    updateSearchHistoryUI();
+                }
+                
+                // Apply preview setting
+                if (typeof settings.previewEnabled === 'boolean') {
+                    previewEnabled = settings.previewEnabled;
+                }
+                
+                showToast('Settings imported');
+            } catch (err) {
+                alert('Error importing settings: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
 // Resizable panes functionality
 function initResizablePanes() {
     const sidebar = document.querySelector('.sidebar');
@@ -157,9 +425,11 @@ function loadFiles(path) {
                 item.className = 'file-item';
                 const fileIcon = getFileIcon(file.name);
                 const isImage = /\.(jpg|jpeg|png|gif|svg|webp|ico)$/i.test(file.name);
+                const fileSize = formatFileSize(file.size || 0);
                 item.innerHTML = `
                     <span class="file-icon">${fileIcon}</span>
-                    <span style="flex: 1;">${escapeHtml(file.name)}</span>
+                    <span class="file-name" style="flex: 1;">${escapeHtml(file.name)}</span>
+                    <span class="file-size" style="color: var(--text-secondary); font-size: 0.75rem; margin-right: 0.5rem;">${fileSize}</span>
                     ${isImage ? `<button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-right: 0.25rem;" onclick="event.stopPropagation(); previewImage('${file.path.replace(/'/g, "\\'")}')" title="Preview Image">👁️</button>` : ''}
                     <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); showRenameDialog('${file.path.replace(/'/g, "\\'")}', false)">Rename</button>
                 `;
@@ -248,7 +518,7 @@ function openFile(path) {
             else if (ext === 'xml') mode = 'text/xml';
             else if (ext === 'json') mode = 'application/json';
             
-            // Initialize CodeMirror
+            // Initialize CodeMirror with enhanced features
             currentEditor = CodeMirror.fromTextArea(document.getElementById('editor'), {
                 mode: mode,
                 theme: 'monokai',
@@ -256,15 +526,38 @@ function openFile(path) {
                 lineWrapping: true,
                 indentUnit: 2,
                 indentWithTabs: false,
-                autofocus: true
+                autofocus: true,
+                // Code folding
+                foldGutter: true,
+                gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+                // Enhanced editing
+                styleActiveLine: true,
+                matchBrackets: true,
+                autoCloseBrackets: true,
+                autoCloseTags: true,
+                // Extra key bindings
+                extraKeys: {
+                    "Ctrl-Q": function(cm) { cm.foldCode(cm.getCursor()); },
+                    "Cmd-Q": function(cm) { cm.foldCode(cm.getCursor()); },
+                    "Ctrl-Space": "autocomplete",
+                    "Ctrl-Z": function(cm) { cm.undo(); },
+                    "Cmd-Z": function(cm) { cm.undo(); },
+                    "Ctrl-Shift-Z": function(cm) { cm.redo(); },
+                    "Cmd-Shift-Z": function(cm) { cm.redo(); },
+                    "Ctrl-Y": function(cm) { cm.redo(); }
+                }
             });
             
             currentEditor.setValue(data.content);
             currentEditor.on('change', () => {
                 document.getElementById('file-status').textContent = 'Unsaved changes';
                 document.getElementById('file-status').className = 'status unsaved';
+                updateFileStats();
                 updatePreview();
             });
+            
+            // Initial file stats
+            updateFileStats();
             
             // Keyboard shortcuts
             currentEditor.on('keydown', (cm, e) => {
@@ -362,6 +655,10 @@ function saveFile() {
     
     const content = currentEditor.getValue();
     
+    // Save to undo history before saving
+    saveToUndoHistory(currentFilePath, content);
+    showProgress(30);
+    
     fetch(`${API_BASE}/api/file`, {
         method: 'POST',
         headers: {
@@ -375,6 +672,7 @@ function saveFile() {
     })
     .then(res => res.json())
     .then(data => {
+        hideProgress();
         if (data.error) {
             alert('Error saving file: ' + data.error);
         } else {
@@ -387,6 +685,7 @@ function saveFile() {
         }
     })
     .catch(err => {
+        hideProgress();
         alert('Error saving file: ' + err.message);
     });
 }
@@ -695,6 +994,9 @@ function performGlobalSearch() {
         alert('Please enter a search query');
         return;
     }
+    
+    // Save to search history
+    addToSearchHistory(search);
     
     const resultsEl = document.getElementById('global-results');
     resultsEl.innerHTML = '<div class="loading">Searching...</div>';
