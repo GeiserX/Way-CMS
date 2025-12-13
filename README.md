@@ -24,11 +24,26 @@ A simple, web-accessible CMS for editing HTML/CSS files downloaded from Wayback 
 
 Way-CMS runs with **two services**: a public website (nginx) and the CMS admin interface (Flask).
 
-1. **Create a directory for your website files:**
-   ```bash
-   mkdir website
-   # Copy your Wayback Archive downloaded files into the website directory
-   ```
+### Development Setup (Builds from source)
+
+Use `docker-compose.yml` for development:
+
+```bash
+docker-compose up -d
+```
+
+### Production Setup (Uses Docker Hub image)
+
+Use `docker-compose.prod.yml` for production:
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+**Note:** The production compose file uses the pre-built image from Docker Hub (`drumsergio/way-cms:latest`). For a specific version, edit `docker-compose.prod.yml` and replace `:latest` with a version tag (e.g., `:v1.2.10`).
+
+1. **Set up your website directory:**
+   - Configure `WEBSITE_DIR` in your `.env` file (see Configuration section)
 
 2. **Set environment variables** (optional, create a `.env` file or copy `.env.example`):
    ```env

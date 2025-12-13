@@ -13,11 +13,11 @@ services:
     networks:
       - way-cms-network
 
-  # CMS admin interface
+  # CMS admin interface - using Docker Hub image
+  # Note: Set DOCKER_USERNAME env var or replace 'drumsergio' with your Docker Hub username
+  # For specific version, set CMS_VERSION env var or edit this file: drumsergio/way-cms:v1.2.10
   cms:
-    build:
-      context: ./cms
-      dockerfile: Dockerfile
+    image: ${DOCKER_USERNAME:-drumsergio}/way-cms:${CMS_VERSION:-latest}
     container_name: way-cms-admin
     ports:
       - "5001:5000"
