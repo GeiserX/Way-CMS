@@ -283,16 +283,16 @@
     </div>
     <div class="header-actions" id="header-actions">
         <div class="header-actions-main" id="header-actions-main">
-                <!-- Primary buttons (can overflow on small screens) -->
-                <button class="btn btn-primary header-action-btn is-overflowable" onclick="downloadCurrentFolder()" data-overflow-key="zip-export" data-overflow-label="📦 ZIP Export">📦 ZIP Export</button>
-                <button class="btn btn-primary header-action-btn is-overflowable" onclick="showUploadZipDialog()" data-overflow-key="zip-import" data-overflow-label="📤 ZIP Import">📤 ZIP Import</button>
-
-            <!-- Overflowable buttons (auto-moved into More when needed) -->
-            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleSearch()" data-overflow-key="search" data-overflow-label="🔍 Search">🔍 Search</button>
-            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleGlobalReplace()" data-overflow-key="replace" data-overflow-label="🔄 Replace">🔄 Replace</button>
-            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleBackups()" data-overflow-key="backups" data-overflow-label="💾 Backups">💾 Backups</button>
-            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="refreshFiles()" data-overflow-key="refresh" data-overflow-label="🔄 Refresh">🔄 Refresh</button>
-            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showUploadFileDialog()" data-overflow-key="upload-file" data-overflow-label="📁 Upload File">📁 Upload File</button>
+            <!-- All action buttons - will overflow into ☰ menu when space is limited -->
+            <button class="btn btn-primary header-action-btn is-overflowable" onclick="downloadCurrentFolder()" data-overflow-label="📦 ZIP Export">📦 ZIP Export</button>
+            <button class="btn btn-primary header-action-btn is-overflowable" onclick="showUploadZipDialog()" data-overflow-label="📤 ZIP Import">📤 ZIP Import</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleSearch()" data-overflow-label="🔍 Search">🔍 Search</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleGlobalReplace()" data-overflow-label="🔄 Replace">🔄 Replace</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleBackups()" data-overflow-label="💾 Backups">💾 Backups</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="refreshFiles()" data-overflow-label="🔄 Refresh">🔄 Refresh</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showUploadFileDialog()" data-overflow-label="📁 Upload File">📁 Upload</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleFileSizeDisplay()" id="toggle-filesize-btn-header" data-overflow-label="📏 File Sizes">📏 Sizes</button>
+            <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleTheme()" data-overflow-label="🌓 Theme">🌓 Theme</button>
         </div>
 
         <div class="menu-dropdown header-overflow" id="header-overflow" style="display: flex;">
@@ -301,10 +301,7 @@
                 <div id="header-menu-overflow-items"></div>
                 <div class="menu-divider" id="header-menu-overflow-divider" style="display:none;"></div>
 
-                <!-- Always-available items -->
-                <a onclick="toggleFileSizeDisplay(); closeHeaderMenu();" id="toggle-filesize-btn" role="menuitem">📏 Show File Sizes</a>
-                <a onclick="toggleTheme(); closeHeaderMenu();" id="theme-menu-btn" role="menuitem">🌓 Toggle Theme</a>
-                <div class="menu-divider"></div>
+                <!-- Always in menu (less frequently used) -->
                 <a onclick="showKeyboardShortcuts(); closeHeaderMenu();" role="menuitem">⌨️ Keyboard Shortcuts</a>
                 <a onclick="exportSettings(); closeHeaderMenu();" role="menuitem">📤 Export Settings</a>
                 <a onclick="importSettings(); closeHeaderMenu();" role="menuitem">📥 Import Settings</a>
