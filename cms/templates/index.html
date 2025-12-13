@@ -5,21 +5,70 @@
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.css">
 <style>
     .CodeMirror {
         height: calc(100vh - 200px);
         font-size: 14px;
+        border-radius: 0 0 8px 8px;
+    }
+    .editor-with-preview {
+        display: flex;
+        height: calc(100vh - 200px);
+        gap: 0;
+    }
+    .editor-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .preview-pane {
+        flex: 1;
+        border-left: 3px solid #3e3e42;
+        background: #f5f5f5;
+        min-width: 0;
+        position: relative;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+    }
+    .preview-pane::before {
+        content: 'Live Preview';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .preview-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        margin-top: 30px;
+        background: white;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <header class="header">
-    <h1>Way-CMS</h1>
+    <h1 class="logo-title">Way-CMS</h1>
     <div class="header-actions">
-        <button class="btn btn-secondary" onclick="toggleSearch()">Search</button>
-        <button class="btn btn-secondary" onclick="refreshFiles()">Refresh</button>
-        <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+        <button class="btn btn-secondary" onclick="downloadCurrentFolder()">📦 Download ZIP</button>
+        <button class="btn btn-secondary" onclick="showUploadZipDialog()">📤 Upload ZIP</button>
+        <button class="btn btn-secondary" onclick="toggleSearch()">🔍 Search</button>
+        <button class="btn btn-secondary" onclick="toggleGlobalReplace()">🔄 Find & Replace</button>
+        <button class="btn btn-secondary" onclick="toggleBackups()">💾 Backups</button>
+        <button class="btn btn-secondary" onclick="refreshFiles()">🔄 Refresh</button>
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary">🚪 Logout</a>
     </div>
 </header>
 
@@ -28,6 +77,10 @@
         <div class="file-browser">
             <div class="breadcrumb" id="breadcrumb">
                 <span class="breadcrumb-item" onclick="navigateTo('')">Root</span>
+            </div>
+            <div class="file-browser-actions" style="padding: 0.5rem; border-bottom: 1px solid #3e3e42;">
+                <button class="btn btn-primary" onclick="showCreateFileDialog()" style="width: 100%; margin-bottom: 0.25rem; padding: 0.25rem;">New File</button>
+                <button class="btn btn-primary" onclick="showCreateFolderDialog()" style="width: 100%; padding: 0.25rem;">New Folder</button>
             </div>
             <div class="file-list" id="fileList">
                 <div class="loading">Loading files...</div>
@@ -43,6 +96,8 @@
             </div>
             <div class="toolbar-actions">
                 <button class="btn btn-primary" onclick="saveFile()">Save</button>
+                <button class="btn btn-secondary" onclick="showFindReplace()">Find & Replace</button>
+                <button class="btn btn-secondary" onclick="togglePreview()" id="preview-toggle">Preview</button>
                 <button class="btn btn-secondary" onclick="closeEditor()">Close</button>
                 <button class="btn btn-danger" onclick="deleteCurrentFile()">Delete</button>
             </div>
@@ -57,6 +112,137 @@
     </main>
 </div>
 
+<!-- Find & Replace in Editor Modal -->
+<div id="editor-find-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2>Find & Replace</h2>
+            <button class="close-btn" onclick="closeEditorFindReplace()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Find:</label>
+                <input type="text" id="editor-find-input" placeholder="Search text">
+            </div>
+            <div class="form-group">
+                <label>Replace:</label>
+                <input type="text" id="editor-replace-input" placeholder="Replace with">
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-primary" onclick="editorFindNext()">Find Next</button>
+                <button class="btn btn-primary" onclick="editorReplace()">Replace</button>
+                <button class="btn btn-primary" onclick="editorReplaceAll()">Replace All</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Global Find & Replace Modal -->
+<div id="global-replace-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+            <h2>Global Find & Replace</h2>
+            <button class="close-btn" onclick="toggleGlobalReplace()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Find:</label>
+                <input type="text" id="global-search-input" placeholder="Search text or regex pattern">
+            </div>
+            <div class="form-group">
+                <label>Replace:</label>
+                <input type="text" id="global-replace-input" placeholder="Replace with">
+            </div>
+            <div class="form-group">
+                <label>File Pattern:</label>
+                <input type="text" id="global-file-pattern" placeholder="*.html, *.css, etc." value="*">
+            </div>
+            <div class="form-group" style="display: flex; gap: 1rem;">
+                <label><input type="checkbox" id="global-regex"> Use Regex</label>
+                <label><input type="checkbox" id="global-case-sensitive"> Case Sensitive</label>
+                <label><input type="checkbox" id="global-dry-run" checked> Dry Run (Preview Only)</label>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-primary" onclick="performGlobalSearch()">Search</button>
+                <button class="btn btn-primary" onclick="performGlobalReplace()">Replace All</button>
+            </div>
+            <div id="global-results" class="search-results" style="max-height: 400px; overflow-y: auto; margin-top: 1rem;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Backups Modal -->
+<div id="backups-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h2>Backups: <span id="backups-file-name"></span></h2>
+            <button class="close-btn" onclick="toggleBackups()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="backups-list" style="max-height: 500px; overflow-y: auto;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Create File/Folder Dialog -->
+<div id="create-dialog" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2 id="create-dialog-title">Create</h2>
+            <button class="close-btn" onclick="closeCreateDialog()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label id="create-dialog-label">Name:</label>
+                <input type="text" id="create-dialog-input" placeholder="Enter name">
+            </div>
+            <button class="btn btn-primary" onclick="confirmCreate()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Rename Dialog -->
+<div id="rename-dialog" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Rename</h2>
+            <button class="close-btn" onclick="closeRenameDialog()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>New Name:</label>
+                <input type="text" id="rename-input" placeholder="Enter new name">
+            </div>
+            <button class="btn btn-primary" onclick="confirmRename()">Rename</button>
+        </div>
+    </div>
+</div>
+
+<!-- Upload ZIP Dialog -->
+<div id="upload-zip-dialog" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2>Upload ZIP Archive</h2>
+            <button class="close-btn" onclick="closeUploadZipDialog()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Select ZIP file to upload:</label>
+                <input type="file" id="zip-file-input" accept=".zip" style="padding: 0.5rem; width: 100%;">
+            </div>
+            <div class="form-group">
+                <label>Extract to path (optional, leave empty for root):</label>
+                <input type="text" id="zip-extract-path" placeholder="e.g., folder/subfolder (optional)">
+            </div>
+            <div id="upload-progress" style="display: none; margin-top: 1rem;">
+                <div class="loading">Uploading and extracting...</div>
+            </div>
+            <button class="btn btn-primary" onclick="uploadZipFile()" style="width: 100%;">Upload & Extract</button>
+        </div>
+    </div>
+</div>
+
+<!-- Search Modal (existing) -->
 <div id="search-modal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
@@ -85,11 +271,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/css/css.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.js"></script>
 <script>
     const API_BASE = '';
     let currentEditor = null;
     let currentFilePath = null;
     let currentPath = '';
+    let previewEnabled = true; // Default ON for HTML files
+    let renameTarget = null;
+    let createType = null;
+    let createPath = null;
 </script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}
