@@ -30,5 +30,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import socket; s=socket.socket(); s.settimeout(1); result=s.connect_ex(('127.0.0.1', 5000)); s.close(); exit(0 if result == 0 else 1)" || exit 1
 
-# Run the application
-CMD ["python", "app.py"]
+# Run the application with Gunicorn (production WSGI server)
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
