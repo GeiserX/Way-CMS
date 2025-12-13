@@ -96,63 +96,113 @@ function syncHeaderOverflow() {
     if (overflowDivider) overflowDivider.style.display = 'none';
 
     const overflowableButtons = Array.from(main.querySelectorAll('.header-action-btn.is-overflowable'));
-    overflowableButtons.forEach((btn) => btn.classList.remove('is-overflowed'));
+    const pinnedButtons = Array.from(main.querySelectorAll('.header-action-btn.is-pinned'));
+    const allButtons = [...pinnedButtons, ...overflowableButtons];
+    
+    // Reset all buttons to visible
+    allButtons.forEach((btn) => btn.classList.remove('is-overflowed'));
+    
+    // Hide overflow button initially to measure without it
+    if (overflowBtn) {
+        overflowBtn.style.display = 'none';
+    }
 
     // Force layout settle to get accurate measurements
     void header.offsetWidth;
     void main.offsetWidth;
 
-    // Calculate available width: header width - logo width - menu button width - gaps and padding
+    // Get actual measurements after reset
     const headerRect = header.getBoundingClientRect();
     const logoContainer = header.querySelector('div:first-child');
     const logoRect = logoContainer ? logoContainer.getBoundingClientRect() : { width: 0 };
-    const overflowBtnRect = overflowBtn ? overflowBtn.getBoundingClientRect() : { width: 80 };
-    const gap = 8; // gap between elements
-    const padding = 48; // total horizontal padding (1.5rem * 2 = 3rem = 48px)
     
-    // Available width for buttons
-    const availableWidth = headerRect.width - logoRect.width - overflowBtnRect.width - padding - (gap * 3);
+    // Get computed styles for padding
+    const headerStyles = window.getComputedStyle(header);
+    const paddingLeft = parseFloat(headerStyles.paddingLeft) || 0;
+    const paddingRight = parseFloat(headerStyles.paddingRight) || 0;
+    const gap = 8; // gap between elements (0.5rem = 8px)
     
-    // Measure actual button widths when all visible
+    // Calculate space taken by logo and gaps
+    const logoWithGap = logoRect.width + gap;
+    
+    // Measure all button widths
     let totalButtonsWidth = 0;
-    const allButtons = Array.from(main.querySelectorAll('.header-action-btn'));
+    const buttonWidths = [];
     allButtons.forEach(btn => {
         const rect = btn.getBoundingClientRect();
-        totalButtonsWidth += rect.width + gap;
+        const width = rect.width;
+        buttonWidths.push({ btn, width });
+        totalButtonsWidth += width + gap; // Add gap after each button (except last)
     });
     
-    // If all buttons fit in available width, show them all
-    if (totalButtonsWidth <= availableWidth) {
-        // All buttons fit - ensure none are hidden
+    // Subtract last gap (no gap after last button)
+    if (buttonWidths.length > 0) {
+        totalButtonsWidth -= gap;
+    }
+    
+    // Calculate available width: full header width minus logo, padding, and gaps
+    const availableWidthWithoutOverflow = headerRect.width - logoWithGap - paddingLeft - paddingRight;
+    
+    // First check: do all buttons fit without overflow button?
+    if (totalButtonsWidth <= availableWidthWithoutOverflow) {
+        // All buttons fit! Hide overflow button and show all buttons
+        if (overflowBtn) {
+            overflowBtn.style.display = 'none';
+        }
         return;
     }
-
-    // Need to move some buttons to overflow - start from the right
+    
+    // Buttons don't all fit - we need the overflow button
+    const overflowBtnWidth = overflowBtn ? (overflowBtn.getBoundingClientRect().width || 80) + gap : 80 + gap;
+    const availableWidthWithOverflow = headerRect.width - logoWithGap - overflowBtnWidth - paddingLeft - paddingRight;
+    
+    // Now calculate what fits: pinned buttons always show, then fit overflowable from left
     let currentWidth = 0;
-    const pinnedButtons = Array.from(main.querySelectorAll('.header-action-btn.is-pinned'));
-    pinnedButtons.forEach(btn => {
-        const rect = btn.getBoundingClientRect();
-        currentWidth += rect.width + gap;
+    
+    // Add pinned buttons first
+    pinnedButtons.forEach((btn) => {
+        const item = buttonWidths.find(b => b.btn === btn);
+        if (item) {
+            currentWidth += item.width + gap;
+        }
     });
     
-    // Now try to fit overflowable buttons from left to right
-    for (const btn of overflowableButtons) {
-        const rect = btn.getBoundingClientRect();
-        const btnWidth = rect.width + gap;
+    // Subtract gap after last pinned button if there are overflowable buttons
+    if (pinnedButtons.length > 0 && overflowableButtons.length > 0) {
+        currentWidth -= gap; // Remove the gap, we'll add it between sections if needed
+    }
+    
+    // Show overflow button since we need it
+    if (overflowBtn) {
+        overflowBtn.style.display = '';
+    }
+    
+    // Now fit overflowable buttons from left to right
+    let overflowCount = 0;
+    for (const item of buttonWidths) {
+        if (!overflowableButtons.includes(item.btn)) continue; // Skip pinned buttons
         
-        if (currentWidth + btnWidth <= availableWidth) {
+        const btnWidth = item.width + gap;
+        
+        if (currentWidth + btnWidth <= availableWidthWithOverflow) {
             // Button fits, keep it visible
             currentWidth += btnWidth;
         } else {
             // Button doesn't fit, move to overflow
-            btn.classList.add('is-overflowed');
-            overflowList.prepend(buildOverflowMenuItemForButton(btn));
+            item.btn.classList.add('is-overflowed');
+            overflowList.prepend(buildOverflowMenuItemForButton(item.btn));
+            overflowCount++;
         }
     }
 
     // Show divider only if there are overflow items
     if (overflowDivider) {
-        overflowDivider.style.display = overflowList.children.length ? 'block' : 'none';
+        overflowDivider.style.display = overflowCount > 0 ? 'block' : 'none';
+    }
+    
+    // If no buttons in overflow, hide the overflow button
+    if (overflowCount === 0 && overflowBtn) {
+        overflowBtn.style.display = 'none';
     }
 }
 
