@@ -161,8 +161,7 @@ body {
     align-items: center;
     min-width: 0;
     overflow: visible; /* allow buttons to overflow naturally, we'll hide them with JS */
-    flex: 1;
-    max-width: 100%; /* prevent it from growing beyond container */
+    flex: 1 1 auto; /* grow to fill available space */
 }
 
 .header-action-btn {

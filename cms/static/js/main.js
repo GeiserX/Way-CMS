@@ -82,10 +82,14 @@ function buildOverflowMenuItemForButton(btn) {
 }
 
 function syncHeaderOverflow() {
+    const header = document.querySelector('.header');
     const main = document.getElementById('header-actions-main');
     const overflowList = document.getElementById('header-menu-overflow-items');
     const overflowDivider = document.getElementById('header-menu-overflow-divider');
-    if (!main || !overflowList) return;
+    const headerActions = document.getElementById('header-actions');
+    const overflowBtn = document.getElementById('header-overflow');
+    
+    if (!main || !overflowList || !header || !headerActions) return;
 
     // Reset overflow state - show all buttons first
     overflowList.innerHTML = '';
@@ -95,30 +99,55 @@ function syncHeaderOverflow() {
     overflowableButtons.forEach((btn) => btn.classList.remove('is-overflowed'));
 
     // Force layout settle to get accurate measurements
+    void header.offsetWidth;
     void main.offsetWidth;
 
-    // Only move buttons to overflow if they don't fit
-    // Check if buttons fit in available space
-    if (main.scrollWidth <= main.clientWidth) {
-        // All buttons fit - nothing to do
+    // Calculate available width: header width - logo width - menu button width - gaps and padding
+    const headerRect = header.getBoundingClientRect();
+    const logoContainer = header.querySelector('div:first-child');
+    const logoRect = logoContainer ? logoContainer.getBoundingClientRect() : { width: 0 };
+    const overflowBtnRect = overflowBtn ? overflowBtn.getBoundingClientRect() : { width: 80 };
+    const gap = 8; // gap between elements
+    const padding = 48; // total horizontal padding (1.5rem * 2 = 3rem = 48px)
+    
+    // Available width for buttons
+    const availableWidth = headerRect.width - logoRect.width - overflowBtnRect.width - padding - (gap * 3);
+    
+    // Measure actual button widths when all visible
+    let totalButtonsWidth = 0;
+    const allButtons = Array.from(main.querySelectorAll('.header-action-btn'));
+    allButtons.forEach(btn => {
+        const rect = btn.getBoundingClientRect();
+        totalButtonsWidth += rect.width + gap;
+    });
+    
+    // If all buttons fit in available width, show them all
+    if (totalButtonsWidth <= availableWidth) {
+        // All buttons fit - ensure none are hidden
         return;
     }
 
-    // Move buttons from right to left into overflow until it fits
-    let safety = 0;
-    while (main.scrollWidth > main.clientWidth && safety < 50) {
-        // Find last visible overflowable button
-        const candidates = overflowableButtons.filter((b) => !b.classList.contains('is-overflowed'));
-        const btn = candidates[candidates.length - 1];
-        if (!btn) break;
-
-        btn.classList.add('is-overflowed');
-        // Prepend so the menu keeps original left-to-right order visually
-        overflowList.prepend(buildOverflowMenuItemForButton(btn));
+    // Need to move some buttons to overflow - start from the right
+    let currentWidth = 0;
+    const pinnedButtons = Array.from(main.querySelectorAll('.header-action-btn.is-pinned'));
+    pinnedButtons.forEach(btn => {
+        const rect = btn.getBoundingClientRect();
+        currentWidth += rect.width + gap;
+    });
+    
+    // Now try to fit overflowable buttons from left to right
+    for (const btn of overflowableButtons) {
+        const rect = btn.getBoundingClientRect();
+        const btnWidth = rect.width + gap;
         
-        // Force reflow to get updated measurements
-        void main.offsetWidth;
-        safety += 1;
+        if (currentWidth + btnWidth <= availableWidth) {
+            // Button fits, keep it visible
+            currentWidth += btnWidth;
+        } else {
+            // Button doesn't fit, move to overflow
+            btn.classList.add('is-overflowed');
+            overflowList.prepend(buildOverflowMenuItemForButton(btn));
+        }
     }
 
     // Show divider only if there are overflow items
@@ -1833,9 +1862,33 @@ function escapeHtml(text) {
 
 // Download ZIP functionality
 function downloadCurrentFolder() {
-    const path = currentPath || '';
+    // Always download from root (empty path = root folder)
+    const path = '';
     const url = `${API_BASE}/api/download-zip?path=${encodeURIComponent(path)}`;
-    window.location.href = url;
+    
+    console.log('Downloading ZIP from root folder:', url);
+    
+    // Use fetch to check if the download starts, then trigger download
+    fetch(url, { method: 'HEAD' })
+        .then(response => {
+            if (response.ok) {
+                // Create a temporary anchor to trigger download
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = '';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert('Error downloading ZIP file. Please check the console for details.');
+                console.error('Download failed:', response.status, response.statusText);
+            }
+        })
+        .catch(err => {
+            console.error('Download error:', err);
+            // Fallback: direct navigation
+            window.location.href = url;
+        });
 }
 
 // Upload ZIP functionality
