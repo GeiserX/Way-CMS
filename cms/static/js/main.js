@@ -48,29 +48,54 @@ document.addEventListener('click', (e) => {
         closeHeaderMenu();
     }
     // Also close any open context menus
-    document.querySelectorAll('.context-menu.show').forEach(menu => {
-        if (!e.target.closest('.context-menu-wrapper')) {
-            menu.classList.remove('show');
-        }
-    });
+    if (!e.target.closest('.context-menu-wrapper') && !e.target.closest('.context-menu')) {
+        hideAllContextMenus();
+    }
 });
+
+// Context menu backdrop
+let contextMenuBackdrop = null;
+
+function createContextMenuBackdrop() {
+    if (!contextMenuBackdrop) {
+        contextMenuBackdrop = document.createElement('div');
+        contextMenuBackdrop.className = 'context-menu-backdrop';
+        contextMenuBackdrop.onclick = () => {
+            hideAllContextMenus();
+        };
+        document.body.appendChild(contextMenuBackdrop);
+    }
+    return contextMenuBackdrop;
+}
 
 // Context menu for files/folders
 function showContextMenu(e, path, isDirectory) {
     e.stopPropagation();
     // Close all other context menus first
-    document.querySelectorAll('.context-menu.show').forEach(menu => {
-        menu.classList.remove('show');
-    });
+    hideAllContextMenus();
     
     const menu = e.target.closest('.context-menu-wrapper').querySelector('.context-menu');
-    menu.classList.toggle('show');
+    menu.classList.add('show');
+    
+    // Show backdrop
+    const backdrop = createContextMenuBackdrop();
+    backdrop.classList.add('show');
 }
 
 function hideContextMenu(menuId) {
     const menu = document.getElementById(menuId);
     if (menu) {
         menu.classList.remove('show');
+    }
+    hideAllContextMenus();
+}
+
+function hideAllContextMenus() {
+    document.querySelectorAll('.context-menu.show').forEach(menu => {
+        menu.classList.remove('show');
+    });
+    if (contextMenuBackdrop) {
+        contextMenuBackdrop.classList.remove('show');
     }
 }
 
@@ -559,11 +584,22 @@ function loadFiles(path, targetEl = null) {
         fileListEl.innerHTML = '<div class="loading">Loading files...</div>';
     }
     
-    fetch(`${API_BASE}/api/files?path=${encodeURIComponent(path)}`)
+    return fetch(`${API_BASE}/api/files?path=${encodeURIComponent(path)}`)
         .then(res => res.json())
         .then(data => {
+            // Clear loading message
+            const loadingEl = fileListEl.querySelector('.loading');
+            if (loadingEl && loadingEl.textContent.includes('Loading')) {
+                loadingEl.remove();
+            }
+            
             if (!targetEl) {
                 fileListEl.innerHTML = '';
+            } else {
+                // For subfolders, clear the loading message if it exists
+                if (fileListEl.innerHTML.includes('Loading')) {
+                    fileListEl.innerHTML = '';
+                }
             }
             
             // Add directories with expandable tree
@@ -580,6 +616,9 @@ function loadFiles(path, targetEl = null) {
                     <div class="context-menu-wrapper" style="position: relative;">
                         <button class="context-menu-btn" onclick="event.stopPropagation(); showContextMenu(event, '${dir.path.replace(/'/g, "\\'")}', true)">⋮</button>
                         <div class="context-menu" id="${menuId}">
+                            <a onclick="event.stopPropagation(); showCreateFileDialogInFolder('${dir.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">➕ Create File</a>
+                            <a onclick="event.stopPropagation(); showCreateFolderDialogInFolder('${dir.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">📁 Create Folder</a>
+                            <div class="menu-divider"></div>
                             <a onclick="event.stopPropagation(); showRenameDialog('${dir.path.replace(/'/g, "\\'")}', true); hideContextMenu('${menuId}');">✏️ Rename</a>
                             <a onclick="event.stopPropagation(); copyPath('${dir.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">📋 Copy Path</a>
                             <a class="danger" onclick="event.stopPropagation(); deleteItem('${dir.path.replace(/'/g, "\\'")}', true); hideContextMenu('${menuId}');">🗑️ Delete</a>
@@ -621,6 +660,8 @@ function loadFiles(path, targetEl = null) {
                     <div class="context-menu-wrapper" style="position: relative;">
                         <button class="context-menu-btn" onclick="event.stopPropagation(); showContextMenu(event, '${file.path.replace(/'/g, "\\'")}', false)">⋮</button>
                         <div class="context-menu" id="${menuId}">
+                            <a onclick="event.stopPropagation(); showCreateFileDialogNearFile('${file.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">➕ Create File</a>
+                            <div class="menu-divider"></div>
                             <a onclick="event.stopPropagation(); showRenameDialog('${file.path.replace(/'/g, "\\'")}', false); hideContextMenu('${menuId}');">✏️ Rename</a>
                             <a onclick="event.stopPropagation(); copyPath('${file.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">📋 Copy Path</a>
                             ${isImage ? `<a onclick="event.stopPropagation(); previewImage('${file.path.replace(/'/g, "\\'")}'); hideContextMenu('${menuId}');">👁️ Preview</a>` : ''}
@@ -640,6 +681,13 @@ function loadFiles(path, targetEl = null) {
             if (data.directories.length === 0 && data.files.length === 0) {
                 if (!targetEl) {
                     fileListEl.innerHTML = '<div class="loading">No files found</div>';
+                } else {
+                    // For empty subfolders, add a message or remove loading
+                    const loadingEl = fileListEl.querySelector('.loading');
+                    if (loadingEl && loadingEl.textContent.includes('Loading')) {
+                        // Don't add "No files" message for subfolders, just leave empty
+                        fileListEl.innerHTML = '';
+                    }
                 }
             }
             
@@ -647,7 +695,17 @@ function loadFiles(path, targetEl = null) {
             updateFileSizeDisplay();
         })
         .catch(err => {
-            fileListEl.innerHTML = `<div class="loading" style="color: #f44336;">Error: ${err.message}</div>`;
+            if (targetEl) {
+                // For subfolders, show error but don't replace entire content
+                const loadingEl = fileListEl.querySelector('.loading');
+                if (loadingEl) {
+                    loadingEl.innerHTML = `<span style="color: #f44336;">Error: ${escapeHtml(err.message)}</span>`;
+                } else {
+                    fileListEl.innerHTML = `<div class="loading" style="color: #f44336;">Error: ${escapeHtml(err.message)}</div>`;
+                }
+            } else {
+                fileListEl.innerHTML = `<div class="loading" style="color: #f44336;">Error: ${escapeHtml(err.message)}</div>`;
+            }
         });
 }
 
@@ -672,8 +730,10 @@ function toggleFolder(path, toggleEl) {
         container.classList.add('expanded');
         dirItem.classList.add('expanded');
         expandedFolders.add(path);
-        container.innerHTML = '<div class="loading" style="padding: 0.5rem; font-size: 0.8rem;">Loading...</div>';
-        loadFiles(path, container);
+        container.innerHTML = '<div class="loading" style="padding: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">Loading...</div>';
+        loadFiles(path, container).catch(() => {
+            // Error handling is done in loadFiles
+        });
     }
 }
 
@@ -686,7 +746,8 @@ function openFile(path) {
     
     // Show editor toolbar
     document.getElementById('editor-toolbar').style.display = 'flex';
-    document.getElementById('current-file').textContent = path;
+    const fileName = path.split('/').pop();
+    document.getElementById('current-file').textContent = fileName || path;
     document.getElementById('file-status').textContent = '';
     document.getElementById('file-status').className = 'status';
     
@@ -1034,9 +1095,42 @@ function showCreateFileDialog() {
     document.getElementById('create-dialog-input').focus();
 }
 
+function showCreateFileDialogInFolder(folderPath) {
+    createType = 'file';
+    createPath = folderPath || '';
+    document.getElementById('create-dialog-title').textContent = 'Create New File';
+    document.getElementById('create-dialog-label').textContent = 'File Name:';
+    document.getElementById('create-dialog-input').value = '';
+    document.getElementById('create-dialog').style.display = 'flex';
+    document.getElementById('create-dialog-input').focus();
+}
+
+function showCreateFileDialogNearFile(filePath) {
+    createType = 'file';
+    // Get the directory of the file
+    const parts = filePath.split('/');
+    parts.pop(); // Remove filename
+    createPath = parts.join('/') || '';
+    document.getElementById('create-dialog-title').textContent = 'Create New File';
+    document.getElementById('create-dialog-label').textContent = 'File Name:';
+    document.getElementById('create-dialog-input').value = '';
+    document.getElementById('create-dialog').style.display = 'flex';
+    document.getElementById('create-dialog-input').focus();
+}
+
 function showCreateFolderDialog() {
     createType = 'folder';
     createPath = currentPath || '';
+    document.getElementById('create-dialog-title').textContent = 'Create New Folder';
+    document.getElementById('create-dialog-label').textContent = 'Folder Name:';
+    document.getElementById('create-dialog-input').value = '';
+    document.getElementById('create-dialog').style.display = 'flex';
+    document.getElementById('create-dialog-input').focus();
+}
+
+function showCreateFolderDialogInFolder(folderPath) {
+    createType = 'folder';
+    createPath = folderPath || '';
     document.getElementById('create-dialog-title').textContent = 'Create New Folder';
     document.getElementById('create-dialog-label').textContent = 'Folder Name:';
     document.getElementById('create-dialog-input').value = '';

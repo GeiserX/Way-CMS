@@ -133,16 +133,58 @@
         right: 0;
         top: 100%;
         background: var(--bg-secondary);
-        min-width: 150px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-        border-radius: 6px;
+        min-width: 180px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1) inset;
+        border-radius: 8px;
         border: 1px solid var(--border-color);
-        z-index: 1000;
+        z-index: 10000;
         display: none;
         overflow: hidden;
+        margin-top: 0.25rem;
+        backdrop-filter: blur(10px);
     }
     .context-menu.show {
         display: block;
+    }
+    /* Backdrop overlay for context menu */
+    .context-menu-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.3);
+        z-index: 9999;
+        display: none;
+    }
+    .context-menu-backdrop.show {
+        display: block;
+    }
+    /* Create button styling */
+    .btn-create {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        background: linear-gradient(135deg, #3e3e42 0%, #2a2d2e 100%);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        transition: all 0.2s ease;
+    }
+    .btn-create:hover {
+        background: linear-gradient(135deg, #505052 0%, #3e3e42 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        border-color: var(--accent-color);
+    }
+    .btn-create:active {
+        transform: translateY(0);
     }
     .context-menu a {
         color: var(--text-primary);
@@ -285,8 +327,14 @@
                 <input type="text" id="file-filter" placeholder="Filter files... (e.g. *.html, *.css)" 
                        style="width: 100%; padding: 0.35rem; margin-bottom: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);"
                        onkeyup="filterFiles(this.value)">
-                <button class="btn btn-primary" onclick="showCreateFileDialog()" style="width: 100%; margin-bottom: 0.25rem; padding: 0.25rem;">New File</button>
-                <button class="btn btn-primary" onclick="showCreateFolderDialog()" style="width: 100%; padding: 0.25rem;">New Folder</button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn-create" onclick="showCreateFileDialog()" title="Create New File">
+                        <span style="font-size: 1.1rem;">➕</span> File
+                    </button>
+                    <button class="btn-create" onclick="showCreateFolderDialog()" title="Create New Folder">
+                        <span style="font-size: 1.1rem;">📁</span> Folder
+                    </button>
+                </div>
             </div>
             <div class="file-list" id="fileList">
                 <div class="loading">Loading files...</div>
