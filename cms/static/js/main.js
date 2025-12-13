@@ -87,15 +87,22 @@ function syncHeaderOverflow() {
     const overflowDivider = document.getElementById('header-menu-overflow-divider');
     if (!main || !overflowList) return;
 
-    // Reset overflow state
+    // Reset overflow state - show all buttons first
     overflowList.innerHTML = '';
     if (overflowDivider) overflowDivider.style.display = 'none';
 
     const overflowableButtons = Array.from(main.querySelectorAll('.header-action-btn.is-overflowable'));
     overflowableButtons.forEach((btn) => btn.classList.remove('is-overflowed'));
 
-    // Force layout settle
+    // Force layout settle to get accurate measurements
     void main.offsetWidth;
+
+    // Only move buttons to overflow if they don't fit
+    // Check if buttons fit in available space
+    if (main.scrollWidth <= main.clientWidth) {
+        // All buttons fit - nothing to do
+        return;
+    }
 
     // Move buttons from right to left into overflow until it fits
     let safety = 0;
@@ -108,9 +115,13 @@ function syncHeaderOverflow() {
         btn.classList.add('is-overflowed');
         // Prepend so the menu keeps original left-to-right order visually
         overflowList.prepend(buildOverflowMenuItemForButton(btn));
+        
+        // Force reflow to get updated measurements
+        void main.offsetWidth;
         safety += 1;
     }
 
+    // Show divider only if there are overflow items
     if (overflowDivider) {
         overflowDivider.style.display = overflowList.children.length ? 'block' : 'none';
     }

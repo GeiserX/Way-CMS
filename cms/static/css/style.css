@@ -160,8 +160,9 @@ body {
     flex-wrap: nowrap;
     align-items: center;
     min-width: 0;
-    overflow: hidden; /* hide overflowing buttons, move them into More */
+    overflow: visible; /* allow buttons to overflow naturally, we'll hide them with JS */
     flex: 1;
+    max-width: 100%; /* prevent it from growing beyond container */
 }
 
 .header-action-btn {
