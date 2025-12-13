@@ -283,9 +283,9 @@
     </div>
     <div class="header-actions" id="header-actions">
         <div class="header-actions-main" id="header-actions-main">
-            <!-- Pinned buttons (always visible) -->
-            <button class="btn btn-primary header-action-btn is-pinned" onclick="downloadCurrentFolder()" data-overflow-key="zip-export" data-overflow-label="📦 ZIP Export">📦 ZIP Export</button>
-            <button class="btn btn-primary header-action-btn is-pinned" onclick="showUploadZipDialog()" data-overflow-key="zip-import" data-overflow-label="📤 ZIP Import">📤 ZIP Import</button>
+                <!-- Primary buttons (can overflow on small screens) -->
+                <button class="btn btn-primary header-action-btn is-overflowable" onclick="downloadCurrentFolder()" data-overflow-key="zip-export" data-overflow-label="📦 ZIP Export">📦 ZIP Export</button>
+                <button class="btn btn-primary header-action-btn is-overflowable" onclick="showUploadZipDialog()" data-overflow-key="zip-import" data-overflow-label="📤 ZIP Import">📤 ZIP Import</button>
 
             <!-- Overflowable buttons (auto-moved into More when needed) -->
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleSearch()" data-overflow-key="search" data-overflow-label="🔍 Search">🔍 Search</button>
