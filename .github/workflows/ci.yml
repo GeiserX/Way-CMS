@@ -34,7 +34,10 @@ jobs:
         fi
       continue-on-error: true
 
-    - name: Test Flask app startup
-      run: |
-        cd cms
-        python -c "from app import app; print('Flask app loads successfully')"
+        - name: Test Flask app startup
+          run: |
+            cd cms
+            # Set environment variables for testing
+            export CMS_BASE_DIR=$(mktemp -d)
+            export SECRET_KEY=test-key
+            python -c "from app import app; print('Flask app loads successfully')"

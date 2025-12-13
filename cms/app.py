@@ -242,21 +242,43 @@ def process_html_for_preview(html_content, file_path):
         url = match.group(3)        # URL
         quote2 = match.group(4) or ''     # Closing quote (can be empty for unquoted)
         
-            # Skip external URLs (including fonts.googleapis.com), data URIs, javascript, anchors, etc.
+        # Skip external URLs, data URIs, javascript, anchors, etc.
         if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', '#', 'mailto:', 'tel:', 'blob:')):
-            return match.group(0)
-        
-        # Allow external font services and CDNs to load (preserve domain structure like Wayback-Archive)
-        external_services = [
-            'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com',
-            'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
-        ]
-        if any(service in url for service in external_services):
             return match.group(0)
         
         # Skip empty URLs
         if not url or not url.strip():
             return match.group(0)
+        
+        # Check if this is a local file with domain structure (like Wayback-Archive does)
+        # Paths like /fonts.googleapis.com/css-abc123.css are LOCAL files, not external URLs
+        # They should be served through preview-assets
+        local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
+        is_local_domain_file = False
+        for domain_path in local_domain_paths:
+            if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
+                # Check if this file exists locally
+                test_path = url.lstrip('/')
+                test_full_path = safe_path(test_path)
+                if test_full_path and os.path.exists(test_full_path):
+                    is_local_domain_file = True
+                    # This is a local file - resolve it properly
+                    resolved = resolve_relative_path(file_path, url)
+                    new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                    if not quote1 and not quote2:
+                        quote1 = quote2 = '"'
+                    return f'{attr_name}={quote1}{new_url}{quote2}'
+        
+        # For truly external CDN URLs (if they don't exist locally), preserve them
+        external_services = [
+            'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
+        ]
+        if any(service in url for service in external_services):
+            # Only preserve if not a local file
+            test_path = url.lstrip('/')
+            test_full_path = safe_path(test_path)
+            if not (test_full_path and os.path.exists(test_full_path)):
+                return match.group(0)  # External URL, preserve as-is
         
         # Resolve relative path - handles both absolute (/) and relative paths
         resolved = resolve_relative_path(file_path, url)
@@ -281,18 +303,33 @@ def process_html_for_preview(html_content, file_path):
         if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
             return match.group(0)
         
-        # Allow external font services and CDNs (preserve domain structure)
-        external_services = [
-            'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com',
-            'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
-        ]
-        if any(service in url for service in external_services):
-            return match.group(0)
-        
         if not url:
             return match.group(0)
         
-        # Resolve relative path
+        # Check if this is a local file with domain structure (like Wayback-Archive)
+        local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
+        for domain_path in local_domain_paths:
+            if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
+                # Check if file exists locally
+                test_path = url.lstrip('/')
+                test_full_path = safe_path(test_path)
+                if test_full_path and os.path.exists(test_full_path):
+                    # This is a local file - resolve it properly
+                    resolved = resolve_relative_path(file_path, url)
+                    new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                    return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+        
+        # For external CDNs (if not local), preserve them
+        external_services = [
+            'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
+        ]
+        if any(service in url for service in external_services):
+            test_path = url.lstrip('/')
+            test_full_path = safe_path(test_path)
+            if not (test_full_path and os.path.exists(test_full_path)):
+                return match.group(0)  # External, preserve
+        
+        # Resolve relative path (for local files)
         resolved = resolve_relative_path(file_path, url)
         new_url = f'/preview-assets/{resolved}'.replace('//', '/')
         
@@ -333,12 +370,35 @@ def process_html_for_preview(html_content, file_path):
             quote2 = m.group(4) or ''
             suffix = m.group(5)  # ")"
             
-            # Skip external URLs (fonts.googleapis.com, etc.), data URIs
+            # Skip external URLs, data URIs
             if url.startswith(('http://', 'https://', '//', 'data:', 'javascript:', 'blob:')):
                 return m.group(0)
             
             if not url:
                 return m.group(0)
+            
+            # Check if this is a local file with domain structure (like Wayback-Archive)
+            local_domain_paths = ['fonts.googleapis.com', 'fonts.gstatic.com']
+            for domain_path in local_domain_paths:
+                if url.startswith(f'/{domain_path}/') or url.startswith(f'{domain_path}/'):
+                    # Check if file exists locally
+                    test_path = url.lstrip('/')
+                    test_full_path = safe_path(test_path)
+                    if test_full_path and os.path.exists(test_full_path):
+                        # This is a local file - resolve it properly
+                        resolved = resolve_relative_path(file_path, url)
+                        new_url = f'/preview-assets/{resolved}'.replace('//', '/')
+                        return f'{prefix}{quote1}{new_url}{quote2}{suffix}'
+            
+            # For external CDNs (if not local), preserve them
+            external_services = [
+                'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com', 'maxcdn.bootstrapcdn.com'
+            ]
+            if any(service in url for service in external_services):
+                test_path = url.lstrip('/')
+                test_full_path = safe_path(test_path)
+                if not (test_full_path and os.path.exists(test_full_path)):
+                    return m.group(0)  # External, preserve
             
             # Resolve path (handles font files: .woff, .woff2, .ttf, .eot, etc.)
             resolved = resolve_relative_path(file_path, url)
