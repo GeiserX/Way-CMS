@@ -89,9 +89,26 @@ docker-compose -f docker-compose.prod.yml up -d
 - `READ_ONLY_MODE`: Set to `true` to enable read-only mode (default: `false`)
 - `SESSION_TIMEOUT_MINUTES`: Session timeout in minutes (default: `1440` = 24 hours)
 - `WEBSITE_URL`: URL of your live website - shows a "🌐 Live Website" link in the CMS header (optional)
-- `WEBSITE_NAME`: Name of your website - displayed in the breadcrumb instead of folder name (optional)
+- `WEBSITE_NAME`: Name of your website - displayed in the breadcrumb and used for backup filenames (optional)
+- `AUTO_BACKUP_ENABLED`: Enable automatic daily backups (default: `true`)
 - `PORT`: Port to run the CMS server on (default: `5000`)
 - `DEBUG`: Enable debug mode (default: `false`)
+
+### Automatic Backups
+
+Way-CMS automatically creates backups with the following schedule:
+
+- **On startup**: Creates an initial backup
+- **Daily**: Creates a backup every day at 2:00 AM
+- **Retention policy**:
+  - Keep daily backups for 7 days
+  - Keep weekly backups (first backup of each week) for 4 weeks
+  - Keep monthly backups (first backup of each month) for 12 months
+  - Keep yearly backups (first backup of each year) forever
+
+Backups are stored in `/.way-cms-backups/auto/` and use ZIP compression (`ZIP_DEFLATED`) to reduce file size. Backups are named using `WEBSITE_NAME` (or folder name if not set) with timestamps: `{WEBSITE_NAME}_YYYYMMDD_HHMMSS.zip`
+
+To disable automatic backups, set `AUTO_BACKUP_ENABLED=false`.
 
 See `.env.example` for a complete example configuration file.
 

@@ -45,6 +45,9 @@ services:
       - WEBSITE_URL=${WEBSITE_URL:-}
       - WEBSITE_NAME=${WEBSITE_NAME:-}
       
+      # Automatic backups (enabled by default)
+      - AUTO_BACKUP_ENABLED=${AUTO_BACKUP_ENABLED:-true}
+      
       # Flask configuration
       - PORT=5000
       - FLASK_APP=app.py
