@@ -112,6 +112,18 @@ body {
     align-items: center;
     border-bottom: 2px solid var(--border-color);
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    min-height: 60px;
+    flex-wrap: nowrap;
+    gap: 1rem;
+}
+
+.header > div:first-child {
+    flex-shrink: 0;
+    white-space: nowrap;
+    min-width: fit-content;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .header h1,
@@ -127,12 +139,37 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     text-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
     margin: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .header-actions {
     display: flex;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-end;
+    align-items: center;
+    overflow: hidden;
+}
+
+.zip-action {
+    flex-shrink: 0;
+}
+
+.header-btn {
+    flex-shrink: 1;
+    transition: opacity 0.2s, visibility 0.2s, display 0.2s;
+    white-space: nowrap;
+}
+
+.header-btn.hidden {
+    display: none !important;
+}
+
+.menu-dropdown {
+    flex-shrink: 0;
 }
 
 /* Main Layout */

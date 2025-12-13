@@ -75,10 +75,57 @@
         z-index: 10;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
+    /* Header responsive design */
+    .header {
+        min-height: 60px;
+        flex-wrap: nowrap;
+    }
+    .header > div:first-child {
+        flex-shrink: 0;
+        white-space: nowrap;
+        min-width: fit-content;
+    }
+    .header-actions {
+        flex: 1;
+        min-width: 0;
+        justify-content: flex-end;
+        overflow: hidden;
+    }
+    .zip-action {
+        flex-shrink: 0;
+    }
+    .header-btn {
+        flex-shrink: 1;
+        transition: opacity 0.2s, visibility 0.2s;
+    }
+    .header-btn.hidden {
+        display: none !important;
+    }
+    @media (max-width: 1400px) {
+        .header-btn[data-button-id="refresh"] {
+            display: none;
+        }
+    }
+    @media (max-width: 1200px) {
+        .header-btn[data-button-id="backups"] {
+            display: none;
+        }
+    }
+    @media (max-width: 1000px) {
+        .header-btn[data-button-id="replace"] {
+            display: none;
+        }
+    }
+    @media (max-width: 800px) {
+        .header-btn[data-button-id="search"] {
+            display: none;
+        }
+    }
     /* Header menu dropdown */
     .menu-dropdown {
         position: relative;
         display: inline-block;
+        flex-shrink: 0;
     }
     .menu-dropdown-content {
         display: none;
@@ -319,18 +366,20 @@
         {% endif %}
     </div>
     <div class="header-actions">
-        <!-- Primary visible buttons -->
-        <button class="btn btn-secondary" onclick="toggleSearch()">🔍 Search</button>
-        <button class="btn btn-secondary" onclick="toggleGlobalReplace()">🔄 Replace</button>
-        <button class="btn btn-secondary" onclick="toggleBackups()">💾 Backups</button>
-        <button class="btn btn-secondary" onclick="refreshFiles()">🔄 Refresh</button>
+        <!-- ZIP Export/Import buttons - always visible on the left -->
+        <button class="btn btn-primary zip-action" onclick="downloadCurrentFolder()" data-button-id="zip-export">📦 ZIP Export</button>
+        <button class="btn btn-primary zip-action" onclick="showUploadZipDialog()" data-button-id="zip-import">📤 ZIP Import</button>
+        
+        <!-- Other primary buttons - will be hidden dynamically if space is limited -->
+        <button class="btn btn-secondary header-btn" onclick="toggleSearch()" data-button-id="search">🔍 Search</button>
+        <button class="btn btn-secondary header-btn" onclick="toggleGlobalReplace()" data-button-id="replace">🔄 Replace</button>
+        <button class="btn btn-secondary header-btn" onclick="toggleBackups()" data-button-id="backups">💾 Backups</button>
+        <button class="btn btn-secondary header-btn" onclick="refreshFiles()" data-button-id="refresh">🔄 Refresh</button>
         
         <!-- Hamburger menu for overflow items -->
         <div class="menu-dropdown">
             <button class="btn btn-secondary menu-toggle" onclick="toggleHeaderMenu()" id="header-menu-toggle">☰ More</button>
             <div class="menu-dropdown-content" id="header-menu-dropdown">
-                <a onclick="downloadCurrentFolder(); closeHeaderMenu();">📦 Download ZIP</a>
-                <a onclick="showUploadZipDialog(); closeHeaderMenu();">📤 Upload ZIP</a>
                 <a onclick="showUploadFileDialog(); closeHeaderMenu();">📁 Upload File</a>
                 <div class="menu-divider"></div>
                 <a onclick="toggleFileSizeDisplay(); closeHeaderMenu();" id="toggle-filesize-btn">📏 Show File Sizes</a>
@@ -536,7 +585,7 @@
 <div id="upload-zip-dialog" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">
-            <h2>Upload ZIP Archive</h2>
+            <h2>ZIP Import</h2>
             <button class="close-btn" onclick="closeUploadZipDialog()">&times;</button>
         </div>
         <div class="modal-body">

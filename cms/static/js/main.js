@@ -1985,9 +1985,96 @@ function closeKeyboardShortcuts() {
     document.getElementById('keyboard-shortcuts-modal').style.display = 'none';
 }
 
+// Dynamic header button visibility based on window width
+function updateHeaderButtonVisibility() {
+    const header = document.querySelector('.header');
+    const logoContainer = header ? header.querySelector('div:first-child') : null;
+    const headerActions = document.querySelector('.header-actions');
+    const menuDropdown = document.querySelector('.menu-dropdown');
+    
+    if (!header || !logoContainer || !headerActions) return;
+    
+    // Get all header buttons
+    const buttons = Array.from(headerActions.querySelectorAll('.header-btn'));
+    const zipButtons = Array.from(headerActions.querySelectorAll('.zip-action'));
+    
+    // Reset all buttons to visible first
+    buttons.forEach(btn => {
+        btn.classList.remove('hidden');
+    });
+    
+    // Force a reflow to get accurate measurements
+    header.offsetHeight;
+    
+    // Get dimensions
+    const headerRect = header.getBoundingClientRect();
+    const logoRect = logoContainer.getBoundingClientRect();
+    const menuRect = menuDropdown ? menuDropdown.getBoundingClientRect() : { width: 0 };
+    
+    // Calculate available space for buttons
+    const padding = 48; // Total padding (left + right)
+    const gap = 8; // Gap between buttons
+    const logoWidth = logoRect.width;
+    const menuWidth = menuRect.width || 80; // Fallback if not measured
+    const availableWidth = headerRect.width - logoWidth - menuWidth - padding - (gap * 2);
+    
+    // Measure all button widths
+    let totalButtonsWidth = 0;
+    const buttonWidths = [];
+    
+    zipButtons.forEach(btn => {
+        const width = btn.offsetWidth || btn.getBoundingClientRect().width;
+        buttonWidths.push({ btn, width });
+        totalButtonsWidth += width + gap;
+    });
+    
+    buttons.forEach(btn => {
+        const width = btn.offsetWidth || btn.getBoundingClientRect().width;
+        buttonWidths.push({ btn, width });
+        totalButtonsWidth += width + gap;
+    });
+    
+    // If buttons don't fit, hide them from right to left (but keep ZIP buttons visible)
+    if (totalButtonsWidth > availableWidth) {
+        // Start hiding from the rightmost header-btn (not ZIP buttons)
+        let currentWidth = zipButtons.reduce((sum, btn) => {
+            return sum + (btn.offsetWidth || btn.getBoundingClientRect().width) + gap;
+        }, 0);
+        
+        // Hide buttons in reverse order (rightmost first)
+        for (let i = buttonWidths.length - 1; i >= 0; i--) {
+            const { btn, width } = buttonWidths[i];
+            // Don't hide ZIP buttons
+            if (btn.classList.contains('zip-action')) {
+                continue;
+            }
+            
+            if (currentWidth + width + gap > availableWidth) {
+                btn.classList.add('hidden');
+            } else {
+                currentWidth += width + gap;
+            }
+        }
+    }
+}
+
 // Initialize theme on load
 document.addEventListener('DOMContentLoaded', () => {
     loadTheme();
+    
+    // Update button visibility on load and resize
+    updateHeaderButtonVisibility();
+    window.addEventListener('resize', updateHeaderButtonVisibility);
+    
+    // Use ResizeObserver for more accurate tracking
+    const header = document.querySelector('.header');
+    if (header && window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(() => {
+            // Small delay to ensure layout has settled
+            setTimeout(updateHeaderButtonVisibility, 50);
+        });
+        resizeObserver.observe(header);
+    }
     
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
