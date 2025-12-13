@@ -25,13 +25,26 @@ services:
       - ./website:/var/www/html:rw
       - ./.way-cms-backups:/.way-cms-backups
     environment:
+      # Base directory for website files
       - CMS_BASE_DIR=/var/www/html
+      
+      # Authentication (use either CMS_PASSWORD or CMS_PASSWORD_HASH)
       - CMS_USERNAME=${CMS_USERNAME:-admin}
       - CMS_PASSWORD=${CMS_PASSWORD:-admin}
       - CMS_PASSWORD_HASH=${CMS_PASSWORD_HASH:-}
+      
+      # Security
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production-please}
+      - READ_ONLY_MODE=${READ_ONLY_MODE:-false}
+      
+      # Session configuration (in minutes, default 24 hours)
+      - SESSION_TIMEOUT_MINUTES=${SESSION_TIMEOUT_MINUTES:-1440}
+      
+      # Website display settings
       - WEBSITE_URL=${WEBSITE_URL:-}
       - WEBSITE_NAME=${WEBSITE_NAME:-}
+      
+      # Flask configuration
       - PORT=5000
       - FLASK_APP=app.py
     restart: unless-stopped

@@ -30,13 +30,21 @@ Way-CMS runs with **two services**: a public website (nginx) and the CMS admin i
    # Copy your Wayback Archive downloaded files into the website directory
    ```
 
-2. **Set environment variables** (optional, create a `.env` file):
+2. **Set environment variables** (optional, create a `.env` file or copy `.env.example`):
    ```env
    CMS_USERNAME=admin
    CMS_PASSWORD=your-secure-password
    SECRET_KEY=your-secret-key-here
    READ_ONLY_MODE=false
    SESSION_TIMEOUT_MINUTES=1440
+   WEBSITE_URL=http://localhost:8080
+   WEBSITE_NAME=My Website
+   ```
+   
+   Or simply copy and edit the example:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your values
    ```
 
 3. **Start the services:**
@@ -59,8 +67,12 @@ Way-CMS runs with **two services**: a public website (nginx) and the CMS admin i
 - `SECRET_KEY`: Flask secret key for sessions (default: auto-generated, **change in production!**)
 - `READ_ONLY_MODE`: Set to `true` to enable read-only mode (default: `false`)
 - `SESSION_TIMEOUT_MINUTES`: Session timeout in minutes (default: `1440` = 24 hours)
+- `WEBSITE_URL`: URL of your live website - shows a "🌐 Live Website" link in the CMS header (optional)
+- `WEBSITE_NAME`: Name of your website - displayed in the breadcrumb instead of folder name (optional)
 - `PORT`: Port to run the CMS server on (default: `5000`)
 - `DEBUG`: Enable debug mode (default: `false`)
+
+See `.env.example` for a complete example configuration file.
 
 ### Volumes
 
