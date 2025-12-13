@@ -167,9 +167,12 @@ function loadFiles(path) {
             data.files.forEach(file => {
                 const item = document.createElement('div');
                 item.className = 'file-item';
+                const fileIcon = getFileIcon(file.name);
+                const isImage = /\.(jpg|jpeg|png|gif|svg|webp|ico)$/i.test(file.name);
                 item.innerHTML = `
-                    <span class="file-icon">📄</span>
+                    <span class="file-icon">${fileIcon}</span>
                     <span style="flex: 1;">${escapeHtml(file.name)}</span>
+                    ${isImage ? `<button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-right: 0.25rem;" onclick="event.stopPropagation(); previewImage('${file.path.replace(/'/g, "\\'")}')" title="Preview Image">👁️</button>` : ''}
                     <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); showRenameDialog('${file.path.replace(/'/g, "\\'")}', false)">Rename</button>
                 `;
                 item.onclick = () => openFile(file.path);
@@ -1045,6 +1048,147 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Handle Escape to close modals
     document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal').forEach(modal => {
+                if (modal.style.display === 'flex') {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+    });
+});
+
+// File icon helper function
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'html': '🌐', 'htm': '🌐',
+        'css': '🎨',
+        'js': '📜', 'javascript': '📜',
+        'json': '📋',
+        'xml': '📄',
+        'md': '📝', 'markdown': '📝',
+        'txt': '📄',
+        'png': '🖼️', 'jpg': '🖼️', 'jpeg': '🖼️', 'gif': '🖼️', 'svg': '🖼️', 'webp': '🖼️', 'ico': '🖼️',
+        'woff': '🔤', 'woff2': '🔤', 'ttf': '🔤', 'eot': '🔤',
+        'zip': '📦',
+        'pdf': '📕'
+    };
+    return icons[ext] || '📄';
+}
+
+// Image preview function
+function previewImage(path) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 90vw; max-height: 90vh; padding: 1rem;">
+            <div class="modal-header">
+                <h2>${path.split('/').pop()}</h2>
+                <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 1rem;">
+                <img src="/preview-assets/${encodeURIComponent(path)}" style="max-width: 100%; max-height: 70vh; border-radius: 4px;" alt="${path}">
+            </div>
+        </div>
+    `;
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+    };
+    document.body.appendChild(modal);
+}
+
+// File upload functions
+function showUploadFileDialog() {
+    document.getElementById('upload-file-dialog').style.display = 'flex';
+    document.getElementById('file-upload-path').value = currentPath || '';
+}
+
+function closeUploadFileDialog() {
+    document.getElementById('upload-file-dialog').style.display = 'none';
+    document.getElementById('file-input').value = '';
+}
+
+function uploadFile() {
+    const fileInput = document.getElementById('file-input');
+    const uploadPath = document.getElementById('file-upload-path').value;
+    const progressDiv = document.getElementById('file-upload-progress');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('Please select a file');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    if (uploadPath) {
+        formData.append('path', uploadPath);
+    }
+    
+    progressDiv.style.display = 'block';
+    
+    fetch(`${API_BASE}/api/upload-file`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        progressDiv.style.display = 'none';
+        if (data.error) {
+            alert('Error uploading file: ' + data.error);
+        } else {
+            alert('File uploaded successfully!');
+            closeUploadFileDialog();
+            loadFiles(currentPath);
+        }
+    })
+    .catch(err => {
+        progressDiv.style.display = 'none';
+        alert('Error: ' + err.message);
+    });
+}
+
+// Theme toggle
+function toggleTheme() {
+    const body = document.body;
+    const currentTheme = body.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    body.setAttribute('data-theme', newTheme);
+    localStorage.setItem('way-cms-theme', newTheme);
+    updateThemeButton(newTheme);
+}
+
+function loadTheme() {
+    const savedTheme = localStorage.getItem('way-cms-theme') || 'dark';
+    document.body.setAttribute('data-theme', savedTheme);
+    updateThemeButton(savedTheme);
+}
+
+function updateThemeButton(theme) {
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+        btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+    }
+}
+
+// Keyboard shortcuts
+function showKeyboardShortcuts() {
+    document.getElementById('keyboard-shortcuts-modal').style.display = 'flex';
+}
+
+function closeKeyboardShortcuts() {
+    document.getElementById('keyboard-shortcuts-modal').style.display = 'none';
+}
+
+// Initialize theme on load
+document.addEventListener('DOMContentLoaded', () => {
+    loadTheme();
+    
+    // Global keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Esc to close modals
         if (e.key === 'Escape') {
             document.querySelectorAll('.modal').forEach(modal => {
                 if (modal.style.display === 'flex') {

@@ -15,11 +15,13 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from werkzeug.utils import secure_filename
 from functools import wraps
 import mimetypes
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production-' + os.urandom(32).hex())
-# Configure permanent sessions with cookie expiration (30 days)
-app.config['PERMANENT_SESSION_LIFETIME'] = 2592000  # 30 days in seconds
+# Configure sessions with configurable timeout
+app.config['PERMANENT_SESSION_LIFETIME'] = SESSION_TIMEOUT_MINUTES * 60  # Convert minutes to seconds
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
@@ -29,8 +31,21 @@ CMS_USERNAME = os.environ.get('CMS_USERNAME', 'admin')
 CMS_PASSWORD_HASH = os.environ.get('CMS_PASSWORD_HASH', '')  # bcrypt hash
 CMS_PASSWORD = os.environ.get('CMS_PASSWORD', '')  # Plain password (legacy, will hash it)
 BACKUP_DIR = os.path.join(os.path.dirname(CMS_BASE_DIR), '.way-cms-backups')
-ALLOWED_EXTENSIONS = {'html', 'htm', 'css', 'js', 'txt', 'xml', 'json', 'md', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'zip'}
+ALLOWED_EXTENSIONS = {'html', 'htm', 'css', 'js', 'txt', 'xml', 'json', 'md', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'zip', 'ico', 'woff', 'woff2', 'ttf', 'eot'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
+READ_ONLY_MODE = os.environ.get('READ_ONLY_MODE', 'false').lower() == 'true'
+SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '1440'))  # Default 24 hours
+
+# Rate limiting - initialize after app is created
+try:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["1000 per hour", "100 per minute"],
+        storage_uri="memory://"
+    )
+except Exception:
+    limiter = None
 
 # Ensure directories exist - gracefully handle permission errors
 try:
@@ -83,6 +98,16 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if (CMS_PASSWORD_HASH or CMS_PASSWORD) and not session.get('logged_in'):
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def read_only_check(f):
+    """Decorator to check if system is in read-only mode."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if READ_ONLY_MODE and request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            return jsonify({'error': 'System is in read-only mode'}), 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -730,6 +755,7 @@ def get_file():
 
 @app.route('/api/file', methods=['POST'])
 @login_required
+@read_only_check
 def save_file():
     """API endpoint to save file contents."""
     data = request.json
@@ -766,6 +792,7 @@ def save_file():
 
 @app.route('/api/file', methods=['PUT'])
 @login_required
+@read_only_check
 def create_file():
     """API endpoint to create new file or folder."""
     data = request.json
@@ -798,6 +825,7 @@ def create_file():
 
 @app.route('/api/file', methods=['PATCH'])
 @login_required
+@read_only_check
 def rename_file():
     """API endpoint to rename file or folder."""
     data = request.json
@@ -832,6 +860,7 @@ def rename_file():
 
 @app.route('/api/file', methods=['DELETE'])
 @login_required
+@read_only_check
 def delete_file():
     """API endpoint to delete a file."""
     file_path = request.args.get('path', '')
@@ -934,6 +963,7 @@ def search_files():
 
 @app.route('/api/search-replace', methods=['POST'])
 @login_required
+@read_only_check
 def search_replace():
     """Enhanced search and replace with preview."""
     data = request.json
@@ -1201,6 +1231,7 @@ def download_folder_zip():
 
 @app.route('/api/upload-zip', methods=['POST'])
 @login_required
+@read_only_check
 def upload_zip():
     """Upload and extract a ZIP file to restore folder."""
     if 'file' not in request.files:
@@ -1263,6 +1294,74 @@ def upload_zip():
         return jsonify({'error': 'Invalid ZIP file'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/upload-file', methods=['POST'])
+@login_required
+@read_only_check
+def upload_file():
+    """API endpoint to upload individual files."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    upload_path = request.form.get('path', '')  # Optional: where to upload
+    
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Check file extension
+    if not allowed_file(file.filename):
+        return jsonify({'error': f'File type not allowed. Allowed: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
+    
+    # Check file size
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+    
+    if file_size > MAX_FILE_SIZE:
+        return jsonify({'error': f'File too large. Max size: {MAX_FILE_SIZE / 1024 / 1024}MB'}), 400
+    
+    try:
+        # Determine upload directory
+        if upload_path:
+            upload_to = safe_path(upload_path)
+            if not upload_to or not os.path.isdir(upload_to):
+                return jsonify({'error': 'Invalid upload path'}), 400
+        else:
+            upload_to = CMS_BASE_DIR
+        
+        # Secure filename
+        filename = secure_filename(file.filename)
+        target_path = os.path.join(upload_to, filename)
+        target_path = safe_path(os.path.relpath(target_path, CMS_BASE_DIR))
+        
+        if not target_path:
+            return jsonify({'error': 'Invalid target path'}), 400
+        
+        # Save file
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        file.save(target_path)
+        
+        return jsonify({
+            'success': True,
+            'path': os.path.relpath(target_path, CMS_BASE_DIR),
+            'size': file_size
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config', methods=['GET'])
+@login_required
+def get_config():
+    """API endpoint to get system configuration (for frontend)."""
+    return jsonify({
+        'read_only': READ_ONLY_MODE,
+        'session_timeout': SESSION_TIMEOUT_MINUTES,
+        'allowed_extensions': list(ALLOWED_EXTENSIONS),
+        'max_file_size': MAX_FILE_SIZE
+    })
 
 
 if __name__ == '__main__':

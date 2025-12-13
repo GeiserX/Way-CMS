@@ -91,9 +91,12 @@
     <div class="header-actions">
         <button class="btn btn-secondary" onclick="downloadCurrentFolder()">📦 Download ZIP</button>
         <button class="btn btn-secondary" onclick="showUploadZipDialog()">📤 Upload ZIP</button>
+        <button class="btn btn-secondary" onclick="showUploadFileDialog()">📁 Upload File</button>
         <button class="btn btn-secondary" onclick="toggleSearch()">🔍 Search</button>
         <button class="btn btn-secondary" onclick="toggleGlobalReplace()">🔄 Find & Replace</button>
         <button class="btn btn-secondary" onclick="toggleBackups()">💾 Backups</button>
+        <button class="btn btn-secondary" onclick="toggleTheme()" id="theme-toggle" title="Toggle Dark/Light Theme">🌓 Theme</button>
+        <button class="btn btn-secondary" onclick="showKeyboardShortcuts()" title="Keyboard Shortcuts">⌨️ Shortcuts</button>
         <button class="btn btn-secondary" onclick="refreshFiles()">🔄 Refresh</button>
         <a href="{{ url_for('logout') }}" class="btn btn-secondary">🚪 Logout</a>
     </div>
@@ -266,6 +269,54 @@
                 <div class="loading">Uploading and extracting...</div>
             </div>
             <button class="btn btn-primary" onclick="uploadZipFile()" style="width: 100%;">Upload & Extract</button>
+        </div>
+    </div>
+</div>
+
+<!-- Upload File Dialog -->
+<div id="upload-file-dialog" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2>Upload File</h2>
+            <button class="close-btn" onclick="closeUploadFileDialog()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Select file to upload:</label>
+                <input type="file" id="file-input" style="padding: 0.5rem; width: 100%;">
+            </div>
+            <div class="form-group">
+                <label>Upload to path (optional, leave empty for current directory):</label>
+                <input type="text" id="file-upload-path" placeholder="e.g., folder/subfolder (optional)" value="">
+            </div>
+            <div id="file-upload-progress" style="display: none; margin-top: 1rem;">
+                <div class="loading">Uploading...</div>
+            </div>
+            <button class="btn btn-primary" onclick="uploadFile()" style="width: 100%;">Upload</button>
+        </div>
+    </div>
+</div>
+
+<!-- Keyboard Shortcuts Modal -->
+<div id="keyboard-shortcuts-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2>Keyboard Shortcuts</h2>
+            <button class="close-btn" onclick="closeKeyboardShortcuts()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="line-height: 2;">
+                <p><strong>Ctrl+S / Cmd+S</strong> - Save current file</p>
+                <p><strong>Ctrl+F / Cmd+F</strong> - Find in editor</p>
+                <p><strong>Ctrl+H / Cmd+H</strong> - Find & Replace in editor</p>
+                <p><strong>Ctrl+G / Cmd+G</strong> - Find next</p>
+                <p><strong>F3</strong> - Find next</p>
+                <p><strong>Shift+F3</strong> - Find previous</p>
+                <p><strong>Ctrl+/ / Cmd+/</strong> - Toggle comment (in editor)</p>
+                <p><strong>Ctrl+Z / Cmd+Z</strong> - Undo</p>
+                <p><strong>Ctrl+Shift+Z / Cmd+Shift+Z</strong> - Redo</p>
+                <p><strong>Esc</strong> - Close dialogs</p>
+            </div>
         </div>
     </div>
 </div>
