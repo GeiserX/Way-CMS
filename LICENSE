@@ -1,0 +1,44 @@
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2025 Way-CMS Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+ADDITIONAL COMMERCIAL USE RESTRICTION
+
+This program is licensed under the GNU General Public License v3.0 (GPL-3.0)
+with the following additional restriction:
+
+COMMERCIAL USE PROHIBITED
+
+Notwithstanding the terms of the GPL-3.0, commercial use of this software
+is strictly prohibited. For the purposes of this restriction, "commercial use"
+includes, but is not limited to:
+
+- Use of this software for any commercial purpose, whether for profit or not
+- Use in any commercial entity or organization
+- Use as part of any commercial service or product
+- Use by any entity that receives payment, directly or indirectly, for services
+  that use this software
+- Use in any production environment of a commercial entity
+
+This restriction applies to all uses, whether direct or indirect, and whether
+the software is used as-is or as part of a derivative work.
+
+If you wish to use this software for commercial purposes, please contact the
+copyright holder to obtain a commercial license.
+
+For personal, educational, or non-commercial use, this software remains free
+and open source under the terms of the GPL-3.0.

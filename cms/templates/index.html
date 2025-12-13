@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Way-CMS - File Editor{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+<style>
+    .CodeMirror {
+        height: calc(100vh - 200px);
+        font-size: 14px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="header">
+    <h1>Way-CMS</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="toggleSearch()">Search</button>
+        <button class="btn btn-secondary" onclick="refreshFiles()">Refresh</button>
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+    </div>
+</header>
+
+<div class="main-layout">
+    <aside class="sidebar">
+        <div class="file-browser">
+            <div class="breadcrumb" id="breadcrumb">
+                <span class="breadcrumb-item" onclick="navigateTo('')">Root</span>
+            </div>
+            <div class="file-list" id="fileList">
+                <div class="loading">Loading files...</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="editor-area">
+        <div id="editor-toolbar" class="editor-toolbar" style="display: none;">
+            <div class="file-info">
+                <span id="current-file"></span>
+                <span id="file-status" class="status"></span>
+            </div>
+            <div class="toolbar-actions">
+                <button class="btn btn-primary" onclick="saveFile()">Save</button>
+                <button class="btn btn-secondary" onclick="closeEditor()">Close</button>
+                <button class="btn btn-danger" onclick="deleteCurrentFile()">Delete</button>
+            </div>
+        </div>
+        <div id="editor-container">
+            <div class="welcome-message">
+                <h2>Welcome to Way-CMS</h2>
+                <p>Select a file from the sidebar to start editing</p>
+                <p>Supported formats: HTML, CSS, JS, TXT, XML, JSON, MD</p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="search-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Search Files</h2>
+            <button class="close-btn" onclick="toggleSearch()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Search Query:</label>
+                <input type="text" id="search-query" placeholder="Enter text to search">
+            </div>
+            <div class="form-group">
+                <label>File Pattern (optional):</label>
+                <input type="text" id="search-pattern" placeholder="*.html, *.css, etc." value="*">
+            </div>
+            <button class="btn btn-primary" onclick="performSearch()">Search</button>
+            <div id="search-results" class="search-results"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/htmlmixed/htmlmixed.min.js"></script>
+<script>
+    const API_BASE = '';
+    let currentEditor = null;
+    let currentFilePath = null;
+    let currentPath = '';
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

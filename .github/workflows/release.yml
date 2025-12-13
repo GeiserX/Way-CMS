@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r cms/requirements.txt
+
+    - name: Test Flask app startup
+      run: |
+        cd cms
+        python -c "from app import app; print('Flask app loads successfully')"
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for tags
+
+    - name: Extract version from tag
+      id: tag_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ steps.tag_version.outputs.version }}
+        body: |
+          ## Way-CMS ${{ steps.tag_version.outputs.version }}
+          
+          ### Installation
+          
+          Using Docker:
+          ```bash
+          docker pull ${{ github.repository_owner }}/way-cms:${{ steps.tag_version.outputs.version }}
+          ```
+          
+          Or clone and run:
+          ```bash
+          git clone https://github.com/${{ github.repository }}.git
+          cd Way-CMS
+          docker-compose up -d
+          ```
+          
+          ### Changes
+          See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

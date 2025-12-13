@@ -1,0 +1,394 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Login Page */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-box {
+    background: #2d2d2d;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    width: 100%;
+    max-width: 400px;
+}
+
+.login-box h1 {
+    margin-bottom: 0.5rem;
+    color: #fff;
+}
+
+.login-box p {
+    margin-bottom: 1.5rem;
+    color: #999;
+}
+
+.error {
+    background: #f44336;
+    color: white;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #d4d4d4;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #444;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Header */
+.header {
+    background: #252526;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #3e3e42;
+}
+
+.header h1 {
+    font-size: 1.25rem;
+    color: #fff;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Main Layout */
+.main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 300px;
+    background: #252526;
+    border-right: 1px solid #3e3e42;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.file-browser {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.breadcrumb {
+    padding: 0.75rem;
+    background: #1e1e1e;
+    border-bottom: 1px solid #3e3e42;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.breadcrumb-item {
+    color: #007acc;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.breadcrumb-item:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb-item:not(:last-child)::after {
+    content: ' / ';
+    color: #666;
+    margin-left: 0.5rem;
+}
+
+.file-list {
+    padding: 0.5rem;
+}
+
+.file-item, .dir-item {
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+}
+
+.file-item:hover, .dir-item:hover {
+    background: #2a2d2e;
+}
+
+.file-item.active {
+    background: #094771;
+}
+
+.file-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.dir-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.loading {
+    padding: 1rem;
+    text-align: center;
+    color: #666;
+}
+
+/* Editor Area */
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #1e1e1e;
+    overflow: hidden;
+}
+
+.editor-toolbar {
+    background: #2d2d2d;
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #3e3e42;
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.file-info span {
+    color: #d4d4d4;
+}
+
+.status {
+    font-size: 0.875rem;
+    color: #999;
+}
+
+.status.saved {
+    color: #4caf50;
+}
+
+.status.unsaved {
+    color: #ff9800;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.welcome-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 2rem;
+}
+
+.welcome-message h2 {
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
+.welcome-message p {
+    color: #999;
+    margin-bottom: 0.5rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.2s;
+}
+
+.btn-primary {
+    background: #007acc;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #005a9e;
+}
+
+.btn-secondary {
+    background: #3e3e42;
+    color: #d4d4d4;
+}
+
+.btn-secondary:hover {
+    background: #505052;
+}
+
+.btn-danger {
+    background: #f44336;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #d32f2f;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #252526;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid #3e3e42;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    color: #fff;
+    font-size: 1.25rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #d4d4d4;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.modal-body {
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.search-results {
+    margin-top: 1rem;
+}
+
+.search-result-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #3e3e42;
+    cursor: pointer;
+}
+
+.search-result-item:hover {
+    background: #2a2d2e;
+}
+
+.search-result-item .file-path {
+    color: #007acc;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.search-result-item .match-line {
+    color: #999;
+    font-size: 0.875rem;
+    margin-left: 1rem;
+}
+
+.match-line .line-number {
+    color: #666;
+    margin-right: 0.5rem;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4e4e4e;
+}
