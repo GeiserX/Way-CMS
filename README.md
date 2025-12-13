@@ -78,8 +78,13 @@ docker-compose -f docker-compose.prod.yml up -d
 - `WEBSITE_DIR`: Path to your website files directory (default: `./website`, can be absolute or relative)
 - `CMS_BASE_DIR`: Directory containing your website files inside container (default: `/var/www/html` - **do not change**)
 - `CMS_USERNAME`: Admin username (default: `admin`)
-- `CMS_PASSWORD`: Admin password in plain text (will be hashed automatically)
+- `CMS_PASSWORD`: Admin password in plain text (will be hashed automatically with bcrypt)
+  - **Recommended**: Just use this - the app will hash it automatically at startup
+  - Example: `CMS_PASSWORD=mySecurePassword123`
 - `CMS_PASSWORD_HASH`: Optional bcrypt hash (if set, `CMS_PASSWORD` is ignored)
+  - **More secure**: Prevents storing plain password in environment variables
+  - Generate hash with: `python3 generate_password_hash.py "your-password"`
+  - Example: `CMS_PASSWORD_HASH=$2b$12$abcd1234...` (long bcrypt hash)
 - `SECRET_KEY`: Flask secret key for sessions (default: auto-generated, **change in production!**)
 - `READ_ONLY_MODE`: Set to `true` to enable read-only mode (default: `false`)
 - `SESSION_TIMEOUT_MINUTES`: Session timeout in minutes (default: `1440` = 24 hours)
