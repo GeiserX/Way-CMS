@@ -160,12 +160,17 @@ body {
 
 .header-btn {
     flex-shrink: 1;
-    transition: opacity 0.2s, visibility 0.2s, display 0.2s;
+    transition: opacity 0.2s, visibility 0.2s;
     white-space: nowrap;
 }
 
 .header-btn.hidden {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 .menu-dropdown {

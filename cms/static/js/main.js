@@ -34,11 +34,20 @@ function updateFileSizeToggleButton() {
 // Header menu dropdown
 function toggleHeaderMenu(e) {
     if (e) {
+        e.preventDefault();
         e.stopPropagation();
     }
     const dropdown = document.getElementById('header-menu-dropdown');
     if (dropdown) {
-        dropdown.classList.toggle('show');
+        const isShowing = dropdown.classList.contains('show');
+        // Close all other dropdowns first
+        document.querySelectorAll('.menu-dropdown-content').forEach(menu => {
+            menu.classList.remove('show');
+        });
+        // Toggle this one
+        if (!isShowing) {
+            dropdown.classList.add('show');
+        }
     }
 }
 
@@ -1999,11 +2008,19 @@ function updateHeaderButtonVisibility() {
     const headerActions = document.querySelector('.header-actions');
     const menuDropdown = document.querySelector('.menu-dropdown');
     
-    if (!header || !logoContainer || !headerActions) return;
+    if (!header || !logoContainer || !headerActions) {
+        console.warn('Header elements not found');
+        return;
+    }
     
     // Get all header buttons
     const buttons = Array.from(headerActions.querySelectorAll('.header-btn'));
     const zipButtons = Array.from(headerActions.querySelectorAll('.zip-action'));
+    
+    if (buttons.length === 0 && zipButtons.length === 0) {
+        console.warn('No buttons found');
+        return;
+    }
     
     // Reset all buttons to visible first to get accurate measurements
     buttons.forEach(btn => {
@@ -2023,7 +2040,7 @@ function updateHeaderButtonVisibility() {
     const gap = 8; // Gap between buttons
     const logoWidth = logoRect.width;
     const menuWidth = menuRect.width;
-    const minSpacing = gap * 2; // Minimum spacing
+    const minSpacing = gap * 3; // Minimum spacing
     const availableWidth = headerRect.width - logoWidth - menuWidth - horizontalPadding - minSpacing;
     
     // Measure button widths (must measure while visible)
@@ -2033,7 +2050,7 @@ function updateHeaderButtonVisibility() {
     // Add ZIP buttons first (always visible)
     zipButtons.forEach(btn => {
         const rect = btn.getBoundingClientRect();
-        const width = rect.width || btn.offsetWidth;
+        const width = rect.width || btn.offsetWidth || 120; // Fallback width
         buttonData.push({ btn, width, alwaysVisible: true });
         totalNeededWidth += width + gap;
     });
@@ -2041,7 +2058,7 @@ function updateHeaderButtonVisibility() {
     // Add regular buttons
     buttons.forEach(btn => {
         const rect = btn.getBoundingClientRect();
-        const width = rect.width || btn.offsetWidth;
+        const width = rect.width || btn.offsetWidth || 100; // Fallback width
         buttonData.push({ btn, width, alwaysVisible: false });
         totalNeededWidth += width + gap;
     });
@@ -2064,7 +2081,9 @@ function updateHeaderButtonVisibility() {
             } else {
                 // Button doesn't fit, hide it and all remaining buttons
                 for (let j = i; j < buttonData.length; j++) {
-                    buttonData[j].btn.classList.add('hidden');
+                    if (!buttonData[j].alwaysVisible) {
+                        buttonData[j].btn.classList.add('hidden');
+                    }
                 }
                 break;
             }
@@ -2076,18 +2095,34 @@ function updateHeaderButtonVisibility() {
 document.addEventListener('DOMContentLoaded', () => {
     loadTheme();
     
-    // Update button visibility on load and resize
-    updateHeaderButtonVisibility();
-    window.addEventListener('resize', updateHeaderButtonVisibility);
+    // Update button visibility on load - wait a bit for layout to settle
+    setTimeout(() => {
+        updateHeaderButtonVisibility();
+    }, 100);
+    
+    // Update on window resize with debounce
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            updateHeaderButtonVisibility();
+        }, 100);
+    });
     
     // Use ResizeObserver for more accurate tracking
     const header = document.querySelector('.header');
     if (header && window.ResizeObserver) {
         const resizeObserver = new ResizeObserver(() => {
             // Small delay to ensure layout has settled
-            setTimeout(updateHeaderButtonVisibility, 50);
+            setTimeout(updateHeaderButtonVisibility, 100);
         });
         resizeObserver.observe(header);
+        
+        // Also observe the header-actions container
+        const headerActions = document.querySelector('.header-actions');
+        if (headerActions) {
+            resizeObserver.observe(headerActions);
+        }
     }
     
     // Global keyboard shortcuts
@@ -2099,6 +2134,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     modal.style.display = 'none';
                 }
             });
+            closeHeaderMenu();
         }
     });
 });
