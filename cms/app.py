@@ -413,9 +413,12 @@ def login():
 def logout():
     """Logout."""
     if MULTI_TENANT:
-        session.clear()
+        # Use the auth module's logout function for proper cleanup
+        from .auth import logout_user
+        logout_user()
     else:
         session.pop('logged_in', None)
+        session.pop('username', None)
     return redirect(url_for('login'))
 
 
