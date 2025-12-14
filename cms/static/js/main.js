@@ -633,6 +633,10 @@ function initResizablePanes() {
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
             
+            // Disable pointer events on any iframes to prevent them capturing mouse
+            const iframes = document.querySelectorAll('iframe');
+            iframes.forEach(iframe => iframe.style.pointerEvents = 'none');
+            
             const startX = e.pageX;
             const startWidth = sidebar.offsetWidth;
             
@@ -647,6 +651,10 @@ function initResizablePanes() {
                 isResizing = false;
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
+                // Re-enable pointer events on iframes
+                iframes.forEach(iframe => iframe.style.pointerEvents = '');
+                document.removeEventListener('mousemove', doResize);
+                document.removeEventListener('mouseup', stopResize);
             }
             
             document.addEventListener('mousemove', doResize);
@@ -690,6 +698,12 @@ function setupEditorPreviewResize() {
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
         
+        // Disable pointer events on iframe to prevent it from capturing mouse events
+        const iframe = previewPane.querySelector('iframe');
+        if (iframe) {
+            iframe.style.pointerEvents = 'none';
+        }
+        
         const startX = e.pageX;
         const editorStartWidth = editorPane.offsetWidth;
         const previewStartWidth = previewPane.offsetWidth;
@@ -708,6 +722,10 @@ function setupEditorPreviewResize() {
             isResizing = false;
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
+            // Re-enable pointer events on iframe
+            if (iframe) {
+                iframe.style.pointerEvents = '';
+            }
             document.removeEventListener('mousemove', doResize);
             document.removeEventListener('mouseup', stopResize);
         }
