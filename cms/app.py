@@ -159,6 +159,24 @@ if MULTI_TENANT:
                         project.assign_user(admin_user.id)
                         print(f"[Migration] Assigned admin user to project")
         
+        # Auto-discover existing project folders in PROJECTS_BASE_DIR
+        if os.path.exists(PROJECTS_BASE_DIR):
+            for entry in os.scandir(PROJECTS_BASE_DIR):
+                if entry.is_dir() and not entry.name.startswith('.'):
+                    folder_slug = entry.name
+                    # Check if project already exists in database
+                    existing_project = Project.get_by_slug(folder_slug)
+                    if not existing_project:
+                        # Create project from folder name
+                        # Convert slug to readable name (clvreformas -> Clvreformas, my-project -> My Project)
+                        project_name = folder_slug.replace('-', ' ').replace('_', ' ').title()
+                        project = Project.create(
+                            name=project_name,
+                            slug=folder_slug,
+                            website_url=None
+                        )
+                        print(f"[Auto-Discovery] Created project '{project_name}' from existing folder '{folder_slug}'")
+        
         print(f"[Way-CMS] Multi-tenant mode enabled. Projects dir: {PROJECTS_BASE_DIR}")
     except ImportError as e:
         print(f"[Way-CMS] Warning: Could not initialize multi-tenant mode: {e}")
