@@ -159,7 +159,7 @@
     .btn-create {
         flex: 1;
         padding: 0.5rem 0.75rem;
-        background: linear-gradient(135deg, #3e3e42 0%, #2a2d2e 100%);
+        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
         border: 1px solid var(--border-color);
         border-radius: 6px;
         color: var(--text-primary);
@@ -173,13 +173,20 @@
         transition: all 0.2s ease;
     }
     .btn-create:hover {
-        background: linear-gradient(135deg, #505052 0%, #3e3e42 100%);
+        background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
         transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         border-color: var(--accent-color);
     }
     .btn-create:active {
         transform: translateY(0);
+    }
+    /* Light theme: add subtle shadow for better visibility */
+    [data-theme="light"] .btn-create {
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    [data-theme="light"] .btn-create:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
     /* Website link styling */
     .website-link {
