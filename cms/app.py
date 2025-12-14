@@ -216,12 +216,8 @@ def login_required(f):
                 if request.is_json or request.headers.get('Accept') == 'application/json':
                     return jsonify({'error': 'Authentication required'}), 401
                 return redirect(url_for('login'))
-            # Also check if a project is selected
-            if not session.get('current_project_id'):
-                # User logged in but no project selected - redirect to select one
-                if request.is_json or request.headers.get('Accept') == 'application/json':
-                    return jsonify({'error': 'No project selected'}), 400
-                return redirect(url_for('index'))
+            # Note: Don't check for project here - let the route handle project selection
+            # to avoid redirect loops when user has no project yet
         else:
             # Single-tenant: check for logged_in flag
             if (CMS_PASSWORD_HASH or CMS_PASSWORD) and not session.get('logged_in'):
