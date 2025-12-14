@@ -752,6 +752,10 @@ function updateBreadcrumb(path) {
 
 function loadFiles(path, targetEl = null) {
     const fileListEl = targetEl || document.getElementById('fileList');
+    if (!fileListEl) {
+        console.warn('fileList element not found, skipping loadFiles');
+        return Promise.resolve();
+    }
     if (!targetEl) {
         fileListEl.innerHTML = '<div class="loading">Loading files...</div>';
     }

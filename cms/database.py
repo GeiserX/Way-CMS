@@ -119,12 +119,18 @@ def migrate_from_single_tenant(old_base_dir, project_name, project_slug):
     return project
 
 def create_admin_user(email, password):
-    """Create the initial admin user if it doesn't exist."""
+    """Create the initial admin user if it doesn't exist, or update password if it does."""
     from .models import User
     
     existing = User.get_by_email(email)
     if existing:
-        print(f"[Database] Admin user '{email}' already exists")
+        # User exists - update password if provided and ensure admin status
+        if password:
+            existing.set_password(password)
+            print(f"[Database] Updated password for admin user '{email}'")
+        if not existing.is_admin:
+            existing.update(is_admin=True)
+            print(f"[Database] Granted admin privileges to '{email}'")
         return existing
     
     user = User.create(email=email, name='Admin', is_admin=True)
