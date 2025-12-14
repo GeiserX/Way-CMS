@@ -1886,6 +1886,18 @@ def upload_zip():
         # Create extraction directory if needed
         Path(extract_to).mkdir(parents=True, exist_ok=True)
         
+        # Clear the target directory before extracting
+        # This ensures no wandering files remain from previous content
+        import shutil
+        for item in os.listdir(extract_to):
+            item_path = os.path.join(extract_to, item)
+            # Safety check: make sure we're only deleting within allowed path
+            if os.path.abspath(item_path).startswith(os.path.abspath(base_dir)):
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                else:
+                    os.unlink(item_path)
+        
         # Extract ZIP file
         extracted_files = []
         with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
