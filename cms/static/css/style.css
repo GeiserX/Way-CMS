@@ -619,6 +619,75 @@ body {
     opacity: 1;
 }
 
+/* Context menu styling */
+.context-menu-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.context-menu-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    line-height: 1;
+}
+
+.context-menu-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.context-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 160px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.context-menu.show {
+    display: block;
+}
+
+.context-menu a {
+    display: block;
+    padding: 0.6rem 1rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.context-menu a:hover {
+    background: var(--bg-secondary);
+}
+
+.context-menu .menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.25rem 0;
+}
+
+.context-menu-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+}
+
 /* File size display */
 .file-size {
     color: var(--text-secondary);
