@@ -6,7 +6,7 @@ import secrets
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from .database import get_db
+from database import get_db
 
 
 class User:

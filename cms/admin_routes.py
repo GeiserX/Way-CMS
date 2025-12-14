@@ -4,10 +4,10 @@ Admin routes for Way-CMS multi-tenant system.
 
 import os
 from flask import Blueprint, request, jsonify, render_template, session
-from .auth import admin_required, get_current_user, login_required
-from .models import User, Project, UserProject, MagicLink
-from .email_service import get_email_service, EmailConfig
-from .database import get_db_stats
+from auth import admin_required, get_current_user, login_required
+from models import User, Project, UserProject, MagicLink
+from email_service import get_email_service, EmailConfig
+from database import get_db_stats
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -64,7 +64,7 @@ def create_user():
     # Send welcome email with magic link
     if send_welcome_email and EmailConfig.is_configured():
         magic_link = MagicLink.create(user.id)
-        from .auth import get_magic_link_url
+        from auth import get_magic_link_url
         magic_link_url = get_magic_link_url(magic_link.token)
         
         # Get project names for email
@@ -134,7 +134,7 @@ def send_magic_link_to_user(user_id):
         return jsonify({'error': 'Email is not configured'}), 400
     
     magic_link = MagicLink.create(user.id)
-    from .auth import get_magic_link_url
+    from auth import get_magic_link_url
     magic_link_url = get_magic_link_url(magic_link.token)
     
     email_service = get_email_service()
@@ -191,7 +191,7 @@ def create_project():
     project = Project.create(name=name, slug=slug, website_url=website_url or None)
     
     # Create project directory
-    from .auth import ensure_project_dir
+    from auth import ensure_project_dir
     ensure_project_dir(project)
     
     return jsonify({'project': project.to_dict()})

@@ -90,11 +90,11 @@ if not MULTI_TENANT and CMS_PASSWORD and not CMS_PASSWORD_HASH:
 # ============== Multi-Tenant Initialization ==============
 if MULTI_TENANT:
     try:
-        from .database import init_db, create_admin_user, migrate_from_single_tenant, check_db_exists
-        from .admin_routes import admin_bp
-        from .auth_routes import auth_bp
-        from . import auth as mt_auth
-        from .models import Project, User
+        from database import init_db, create_admin_user, migrate_from_single_tenant, check_db_exists
+        from admin_routes import admin_bp
+        from auth_routes import auth_bp
+        import auth as mt_auth
+        from models import Project, User
         
         # Check if this is first run (migration scenario)
         first_run = not check_db_exists()
@@ -302,8 +302,8 @@ def index():
     
     if MULTI_TENANT:
         # Multi-tenant: get info from current project
-        from .models import Project
-        from .auth import get_current_user
+        from models import Project
+        from auth import get_current_user
         
         user = get_current_user()
         if not user:
@@ -321,7 +321,7 @@ def index():
         # If no project selected but user has projects, select the first one
         if not project and projects:
             project = projects[0]
-            from .auth import set_current_project
+            from auth import set_current_project
             set_current_project(project)
         
         if project:
@@ -368,8 +368,8 @@ def login():
             if not email:
                 return render_template('login.html', error='Email is required', multi_tenant=True)
             
-            from .models import User
-            from .auth import login_user as mt_login_user
+            from models import User
+            from auth import login_user as mt_login_user
             
             user = User.get_by_email(email)
             if not user:
@@ -429,7 +429,7 @@ def logout():
     """Logout."""
     if MULTI_TENANT:
         # Use the auth module's logout function for proper cleanup
-        from .auth import logout_user
+        from auth import logout_user
         logout_user()
     else:
         session.pop('logged_in', None)
@@ -1959,7 +1959,7 @@ def get_my_projects():
     if not MULTI_TENANT:
         return jsonify({'error': 'Not in multi-tenant mode'}), 400
     
-    from .auth import get_current_user
+    from auth import get_current_user
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Not authenticated'}), 401
@@ -1980,8 +1980,8 @@ def switch_project():
     if not MULTI_TENANT:
         return jsonify({'error': 'Not in multi-tenant mode'}), 400
     
-    from .auth import get_current_user, set_current_project
-    from .models import Project
+    from auth import get_current_user, set_current_project
+    from models import Project
     
     user = get_current_user()
     if not user:
@@ -2021,7 +2021,7 @@ def get_config():
     }
     
     if MULTI_TENANT:
-        from .auth import get_current_user, get_current_project
+        from auth import get_current_user, get_current_project
         user = get_current_user()
         project = get_current_project()
         config['user'] = user.to_dict() if user else None
@@ -2262,7 +2262,7 @@ def manage_backup_retention():
     """
     if MULTI_TENANT:
         # Manage retention for each project
-        from .models import Project
+        from models import Project
         projects = Project.get_all()
         for project in projects:
             manage_backup_retention_for_project(project.slug)
@@ -2374,7 +2374,7 @@ def schedule_daily_backup():
                         # We got the lock
                         print(f"Creating scheduled daily backup at {datetime.now()}")
                         if MULTI_TENANT:
-                            from .models import Project
+                            from models import Project
                             projects = Project.get_all()
                             for project in projects:
                                 project_path = os.path.join(PROJECTS_BASE_DIR, project.slug)
@@ -2393,7 +2393,7 @@ def schedule_daily_backup():
                 except (ImportError, OSError):
                     # File locking not available, just create backup
                     if MULTI_TENANT:
-                        from .models import Project
+                        from models import Project
                         projects = Project.get_all()
                         for project in projects:
                             project_path = os.path.join(PROJECTS_BASE_DIR, project.slug)
@@ -2464,7 +2464,7 @@ def initialize_automatic_backups():
             print("Creating initial automatic backup...")
             if MULTI_TENANT:
                 # In multi-tenant mode, backup all projects
-                from .models import Project
+                from models import Project
                 projects = Project.get_all()
                 if projects:
                     for project in projects:

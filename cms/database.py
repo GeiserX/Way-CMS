@@ -100,7 +100,7 @@ def migrate_from_single_tenant(old_base_dir, project_name, project_slug):
     Migrate from single-tenant setup to multi-tenant.
     Creates a project entry for the existing website folder.
     """
-    from .models import Project
+    from models import Project
     
     # Check if project already exists
     existing = Project.get_by_slug(project_slug)
@@ -120,7 +120,7 @@ def migrate_from_single_tenant(old_base_dir, project_name, project_slug):
 
 def create_admin_user(email, password):
     """Create the initial admin user if it doesn't exist, or update password if it does."""
-    from .models import User
+    from models import User
     
     existing = User.get_by_email(email)
     if existing:

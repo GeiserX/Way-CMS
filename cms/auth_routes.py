@@ -4,14 +4,14 @@ Authentication routes for Way-CMS multi-tenant system.
 
 import os
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, session
-from .auth import (
+from auth import (
     get_current_user, login_user, logout_user, 
     verify_magic_link, authenticate_with_password,
     get_magic_link_url, create_magic_link, login_required,
     set_current_project
 )
-from .models import User, MagicLink, Project
-from .email_service import get_email_service, EmailConfig
+from models import User, MagicLink, Project
+from email_service import get_email_service, EmailConfig
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 

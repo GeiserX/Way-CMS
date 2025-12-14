@@ -6,7 +6,7 @@ Handles magic links, password auth, and decorators.
 import os
 from functools import wraps
 from flask import session, redirect, url_for, jsonify, request
-from .models import User, MagicLink, Project
+from models import User, MagicLink, Project
 
 
 def get_current_user() -> User | None:
