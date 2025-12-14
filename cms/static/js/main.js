@@ -182,11 +182,34 @@ function createContextMenuBackdrop() {
 // Context menu for files/folders
 function showContextMenu(e, path, isDirectory) {
     e.stopPropagation();
+    e.preventDefault();
+    
     // Close all other context menus first
     hideAllContextMenus();
     
+    const button = e.target.closest('.context-menu-btn');
     const menu = e.target.closest('.context-menu-wrapper').querySelector('.context-menu');
+    
+    // Position menu using fixed positioning relative to button
+    const buttonRect = button.getBoundingClientRect();
+    menu.style.top = (buttonRect.bottom + 2) + 'px';
+    menu.style.left = 'auto';
+    menu.style.right = (window.innerWidth - buttonRect.right) + 'px';
+    
+    // Make sure menu doesn't go off screen
     menu.classList.add('show');
+    const menuRect = menu.getBoundingClientRect();
+    
+    // Adjust if menu goes below viewport
+    if (menuRect.bottom > window.innerHeight) {
+        menu.style.top = (buttonRect.top - menuRect.height - 2) + 'px';
+    }
+    
+    // Adjust if menu goes off left side
+    if (menuRect.left < 0) {
+        menu.style.right = 'auto';
+        menu.style.left = '4px';
+    }
     
     // Show backdrop
     const backdrop = createContextMenuBackdrop();

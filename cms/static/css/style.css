@@ -611,23 +611,19 @@ body {
 .file-item .btn, .dir-item .btn,
 .file-item .context-menu-btn, .dir-item .context-menu-btn {
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.15s;
 }
 
 .file-item:hover .btn, .dir-item:hover .btn,
-.file-item:hover .context-menu-btn, .dir-item:hover .context-menu-btn,
-/* Keep button visible when menu is open */
-.context-menu-wrapper:hover .context-menu-btn,
-.context-menu.show ~ .context-menu-btn,
-.file-item .context-menu.show + .context-menu-btn,
-.dir-item .context-menu.show + .context-menu-btn {
+.file-item:hover .context-menu-btn, .dir-item:hover .context-menu-btn {
     opacity: 1;
 }
 
-/* Keep button visible when context menu is showing */
+/* Keep button visible when context menu is showing - no transition */
 .file-item:has(.context-menu.show) .context-menu-btn,
 .dir-item:has(.context-menu.show) .context-menu-btn {
-    opacity: 1;
+    opacity: 1 !important;
+    transition: none;
 }
 
 /* Context menu styling */
@@ -654,15 +650,13 @@ body {
 
 .context-menu {
     display: none;
-    position: absolute;
-    right: 0;
-    top: 100%;
+    position: fixed;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     min-width: 160px;
-    z-index: 1000;
+    z-index: 1001;
     overflow: hidden;
 }
 
@@ -697,7 +691,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 999;
+    z-index: 1000;
     background: transparent;
 }
 
