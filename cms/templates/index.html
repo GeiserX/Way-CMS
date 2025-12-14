@@ -347,7 +347,7 @@
     <aside class="sidebar">
         <div class="file-browser">
             <div class="breadcrumb" id="breadcrumb" data-folder-name="{{ folder_name }}">
-                {% if multi_tenant and projects|length > 1 %}
+                {% if multi_tenant and projects|length > 0 %}
                 <div class="project-selector">
                     <select id="project-select" onchange="switchProject(this.value)">
                         {% for project in projects %}

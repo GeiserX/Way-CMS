@@ -303,18 +303,33 @@ def index():
     if MULTI_TENANT:
         # Multi-tenant: get info from current project
         from .models import Project
+        from .auth import get_current_user
+        
+        user = get_current_user()
+        if not user:
+            return redirect(url_for('login'))
+        
+        # Get projects - admins see all projects, regular users see assigned projects
+        if user.is_admin:
+            projects = Project.get_all()
+        else:
+            projects = user.get_projects()
+        
+        # Get current project
         project = Project.get_by_id(session.get('current_project_id'))
+        
+        # If no project selected but user has projects, select the first one
+        if not project and projects:
+            project = projects[0]
+            from .auth import set_current_project
+            set_current_project(project)
+        
         if project:
             folder_name = project.name
             website_url = project.website_url or ''
         else:
             folder_name = 'No Project'
             website_url = ''
-        
-        # Get user info and projects list for template
-        from .auth import get_current_user
-        user = get_current_user()
-        projects = user.get_projects() if user else []
         
         return render_template('index.html', 
                              base_dir=base_dir, 
@@ -324,7 +339,7 @@ def index():
                              user=user,
                              projects=projects,
                              current_project=project,
-                             is_admin=user.is_admin if user else False)
+                             is_admin=user.is_admin)
     else:
         # Single-tenant: use environment variables
         if WEBSITE_NAME:
