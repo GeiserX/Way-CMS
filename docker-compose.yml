@@ -77,6 +77,9 @@ services:
       - WEBSITE_URL=${WEBSITE_URL:-}
       - WEBSITE_NAME=${WEBSITE_NAME:-}
       
+      # Backup directory (default: /.way-cms-backups)
+      - BACKUP_DIR=${BACKUP_DIR:-/.way-cms-backups}
+      
       # Automatic backups (enabled by default)
       - AUTO_BACKUP_ENABLED=${AUTO_BACKUP_ENABLED:-true}
       

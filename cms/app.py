@@ -2254,12 +2254,42 @@ def schedule_daily_backup():
                 wait_seconds = (next_backup - now).total_seconds()
                 time.sleep(wait_seconds)
                 
-                # Create backup
-                print(f"Creating scheduled daily backup at {datetime.now()}")
-                create_automatic_backup()
-                
-                # Manage retention
-                manage_backup_retention()
+                # Create backup with file lock to prevent multiple workers
+                try:
+                    import fcntl
+                    lock_fd = os.open(_backup_lock_file, os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+                    try:
+                        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        # We got the lock
+                        print(f"Creating scheduled daily backup at {datetime.now()}")
+                        if MULTI_TENANT:
+                            from .models import Project
+                            projects = Project.get_all()
+                            for project in projects:
+                                project_path = os.path.join(PROJECTS_BASE_DIR, project.slug)
+                                if os.path.exists(project_path):
+                                    create_automatic_backup(project_slug=project.slug, base_dir=project_path)
+                        else:
+                            create_automatic_backup()
+                        manage_backup_retention()
+                        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    except (IOError, OSError):
+                        # Another worker is doing the backup
+                        pass
+                    finally:
+                        os.close(lock_fd)
+                except (ImportError, OSError):
+                    # File locking not available, just create backup
+                    if MULTI_TENANT:
+                        from .models import Project
+                        projects = Project.get_all()
+                        for project in projects:
+                            project_path = os.path.join(PROJECTS_BASE_DIR, project.slug)
+                            if os.path.exists(project_path):
+                                create_automatic_backup(project_slug=project.slug, base_dir=project_path)
+                    else:
+                        create_automatic_backup()
+                    manage_backup_retention()
                 
             except Exception as e:
                 print(f"Error in backup scheduler: {e}")
@@ -2273,24 +2303,79 @@ def schedule_daily_backup():
 
 # Initialize automatic backups on startup
 # Only initialize once (important for Gunicorn with multiple workers)
-_backup_initialized = False
+# Use file-based locking to prevent multiple workers from running backups
+_backup_lock_file = os.path.join(BACKUP_DIR, '.backup_init_lock')
 
 def initialize_automatic_backups():
-    """Initialize automatic backup system (call once on app startup)."""
-    global _backup_initialized
-    if _backup_initialized or not AUTO_BACKUP_ENABLED:
+    """Initialize automatic backup system (call once on app startup).
+    Uses file locking to prevent multiple Gunicorn workers from running backups.
+    """
+    if not AUTO_BACKUP_ENABLED:
         return
     
-    _backup_initialized = True
+    # Try to acquire lock (only one worker should succeed)
+    try:
+        import fcntl
+        lock_fd = os.open(_backup_lock_file, os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # We got the lock - we're the master worker
+            print("[AutoBackup] Master worker acquired lock, initializing backups...")
+        except (IOError, OSError):
+            # Another worker already has the lock
+            os.close(lock_fd)
+            print("[AutoBackup] Another worker is handling backups, skipping initialization")
+            return
+    except (ImportError, OSError, IOError):
+        # File locking not available (Windows) or lock file issues
+        # Fall back to simple check - this might still create multiple backups on Windows
+        if os.path.exists(_backup_lock_file):
+            # Check if lock file is recent (less than 30 seconds old)
+            try:
+                lock_age = time.time() - os.path.getmtime(_backup_lock_file)
+                if lock_age < 30:
+                    print("[AutoBackup] Backup initialization recently completed, skipping")
+                    return
+            except:
+                pass
+        
+        # Create lock file
+        try:
+            with open(_backup_lock_file, 'w') as f:
+                f.write(str(os.getpid()))
+        except:
+            pass
     
     # Create initial backup on startup (delay slightly to allow app to fully initialize)
     def create_startup_backup():
         try:
             print("Creating initial automatic backup...")
-            create_automatic_backup()
+            if MULTI_TENANT:
+                # In multi-tenant mode, backup all projects
+                from .models import Project
+                projects = Project.get_all()
+                if projects:
+                    for project in projects:
+                        project_path = os.path.join(PROJECTS_BASE_DIR, project.slug)
+                        if os.path.exists(project_path):
+                            create_automatic_backup(project_slug=project.slug, base_dir=project_path)
+                else:
+                    # No projects yet, skip backup
+                    print("[AutoBackup] No projects found, skipping initial backup")
+            else:
+                # Single-tenant mode
+                create_automatic_backup()
             manage_backup_retention()
         except Exception as e:
             print(f"Warning: Could not create initial backup: {e}")
+        finally:
+            # Release lock after backup
+            try:
+                if 'lock_fd' in locals():
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    os.close(lock_fd)
+            except:
+                pass
     
     # Delay startup backup by 10 seconds to allow app to initialize
     startup_thread = threading.Thread(target=lambda: (time.sleep(10), create_startup_backup()), daemon=True)
