@@ -2156,8 +2156,101 @@ def create_automatic_backup(project_slug=None, base_dir=None):
         traceback.print_exc()
         return None
 
+def manage_backup_retention_for_project(project_slug):
+    """Manage backup retention for a specific project."""
+    project_backup_dir = os.path.join(BACKUP_DIR, project_slug, 'auto')
+    if not os.path.exists(project_backup_dir):
+        return
+    
+    try:
+        now = datetime.now()
+        backups = []
+        
+        # Collect all backup files with their timestamps
+        for filename in os.listdir(project_backup_dir):
+            if not filename.endswith('.zip'):
+                continue
+            
+            backup_path = os.path.join(project_backup_dir, filename)
+            if not os.path.isfile(backup_path):
+                continue
+            
+            try:
+                # Extract timestamp from filename: website_name_YYYYMMDD_HHMMSS.zip
+                parts = filename.replace('.zip', '').split('_')
+                if len(parts) >= 3:
+                    date_str = parts[-2]  # YYYYMMDD
+                    backup_date = datetime.strptime(date_str, '%Y%m%d')
+                    backups.append((backup_path, backup_date, now - backup_date))
+            except (ValueError, IndexError):
+                # Skip files with invalid format
+                continue
+        
+        # Sort by date (oldest first)
+        backups.sort(key=lambda x: x[1])
+        
+        # Keep all yearly backups (first backup of each year)
+        yearly_backups = {}
+        for backup_path, backup_date, age in backups:
+            year = backup_date.year
+            if year not in yearly_backups:
+                yearly_backups[year] = backup_path
+        
+        # Keep all monthly backups (first backup of each month) for last 12 months
+        monthly_backups = {}
+        for backup_path, backup_date, age in backups:
+            if age.days <= 365:  # Within a year
+                month_key = (backup_date.year, backup_date.month)
+                if month_key not in monthly_backups:
+                    monthly_backups[month_key] = backup_path
+        
+        # Keep all weekly backups (first backup of each week) for last 4 weeks
+        weekly_backups = {}
+        for backup_path, backup_date, age in backups:
+            if age.days <= 28:  # Within 4 weeks
+                week_key = (backup_date.year, backup_date.isocalendar()[1])  # ISO week
+                if week_key not in weekly_backups:
+                    weekly_backups[week_key] = backup_path
+        
+        # Keep all daily backups for last 7 days
+        daily_backups = set()
+        for backup_path, backup_date, age in backups:
+            if age.days <= 7:
+                daily_backups.add(backup_path)
+        
+        # Combine all backups to keep
+        backups_to_keep = set(yearly_backups.values()) | set(monthly_backups.values()) | \
+                         set(weekly_backups.values()) | daily_backups
+        
+        # Delete backups not in the keep list
+        deleted_count = 0
+        for backup_path, backup_date, age in backups:
+            if backup_path not in backups_to_keep:
+                try:
+                    os.remove(backup_path)
+                    deleted_count += 1
+                except OSError as e:
+                    print(f"Warning: Could not delete old backup {backup_path}: {e}")
+        
+        if deleted_count > 0:
+            print(f"Cleaned up {deleted_count} old backup(s) for project {project_slug}")
+            
+    except Exception as e:
+        print(f"Error managing backup retention for project {project_slug}: {e}")
+
 def manage_backup_retention():
-    """Manage backup retention: keep daily (7 days), weekly (4 weeks), monthly (12 months), yearly (all)."""
+    """Manage backup retention: keep daily (7 days), weekly (4 weeks), monthly (12 months), yearly (all).
+    In multi-tenant mode, manages retention for all projects.
+    """
+    if MULTI_TENANT:
+        # Manage retention for each project
+        from .models import Project
+        projects = Project.get_all()
+        for project in projects:
+            manage_backup_retention_for_project(project.slug)
+        return
+    
+    # Single-tenant mode - use global AUTO_BACKUP_DIR
     if not os.path.exists(AUTO_BACKUP_DIR):
         return
     
@@ -2269,9 +2362,10 @@ def schedule_daily_backup():
                                 project_path = os.path.join(PROJECTS_BASE_DIR, project.slug)
                                 if os.path.exists(project_path):
                                     create_automatic_backup(project_slug=project.slug, base_dir=project_path)
+                                    manage_backup_retention_for_project(project.slug)
                         else:
                             create_automatic_backup()
-                        manage_backup_retention()
+                            manage_backup_retention()
                         fcntl.flock(lock_fd, fcntl.LOCK_UN)
                     except (IOError, OSError):
                         # Another worker is doing the backup
@@ -2358,16 +2452,21 @@ def initialize_automatic_backups():
                     for project in projects:
                         project_path = os.path.join(PROJECTS_BASE_DIR, project.slug)
                         if os.path.exists(project_path):
+                            print(f"[AutoBackup] Backing up project: {project.name} (slug: {project.slug})")
                             create_automatic_backup(project_slug=project.slug, base_dir=project_path)
+                            # Manage retention for this project
+                            manage_backup_retention_for_project(project.slug)
                 else:
                     # No projects yet, skip backup
                     print("[AutoBackup] No projects found, skipping initial backup")
             else:
                 # Single-tenant mode
                 create_automatic_backup()
-            manage_backup_retention()
+                manage_backup_retention()
         except Exception as e:
             print(f"Warning: Could not create initial backup: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             # Release lock after backup
             try:
