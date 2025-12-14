@@ -69,11 +69,18 @@ let projectsData = [];
 async function loadUsers() {
     try {
         const response = await fetch('/admin/users');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            showToast('Error loading users: ' + (errorData.error || response.statusText), 'error');
+            console.error('Users API error:', response.status, errorData);
+            return;
+        }
         const data = await response.json();
-        usersData = data.users;
+        usersData = data.users || [];
         renderUsers();
     } catch (error) {
         showToast('Error loading users: ' + error.message, 'error');
+        console.error('Users fetch error:', error);
     }
 }
 
@@ -263,11 +270,18 @@ async function sendMagicLink(userId) {
 async function loadProjects() {
     try {
         const response = await fetch('/admin/projects');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            showToast('Error loading projects: ' + (errorData.error || response.statusText), 'error');
+            console.error('Projects API error:', response.status, errorData);
+            return;
+        }
         const data = await response.json();
-        projectsData = data.projects;
+        projectsData = data.projects || [];
         renderProjects();
     } catch (error) {
         showToast('Error loading projects: ' + error.message, 'error');
+        console.error('Projects fetch error:', error);
     }
 }
 
