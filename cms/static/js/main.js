@@ -619,6 +619,17 @@ function importSettings() {
     input.click();
 }
 
+// Global state for sidebar resize
+let sidebarResizeState = {
+    isResizing: false,
+    startX: 0,
+    startWidth: 0,
+    sidebar: null,
+    iframes: null,
+    doResize: null,
+    stopResize: null
+};
+
 // Resizable panes functionality
 function initResizablePanes() {
     const sidebar = document.querySelector('.sidebar');
@@ -626,45 +637,73 @@ function initResizablePanes() {
     const editorArea = document.querySelector('.editor-area');
     
     if (sidebarHandle && sidebar && editorArea) {
-        let isResizing = false;
+        sidebarResizeState.sidebar = sidebar;
+        
+        sidebarResizeState.doResize = function(e) {
+            // Check if mouse button is still pressed
+            if (!sidebarResizeState.isResizing || e.buttons !== 1) {
+                if (sidebarResizeState.isResizing) {
+                    sidebarResizeState.stopResize();
+                }
+                return;
+            }
+            const diff = e.pageX - sidebarResizeState.startX;
+            const newWidth = Math.max(200, Math.min(window.innerWidth * 0.5, sidebarResizeState.startWidth + diff));
+            sidebarResizeState.sidebar.style.width = newWidth + 'px';
+        };
+        
+        sidebarResizeState.stopResize = function() {
+            sidebarResizeState.isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            // Re-enable pointer events on iframes
+            if (sidebarResizeState.iframes) {
+                sidebarResizeState.iframes.forEach(iframe => iframe.style.pointerEvents = '');
+            }
+            document.removeEventListener('mousemove', sidebarResizeState.doResize);
+            document.removeEventListener('mouseup', sidebarResizeState.stopResize);
+            window.removeEventListener('mouseup', sidebarResizeState.stopResize);
+        };
         
         sidebarHandle.addEventListener('mousedown', (e) => {
-            isResizing = true;
+            // Clean up any previous listeners
+            document.removeEventListener('mousemove', sidebarResizeState.doResize);
+            document.removeEventListener('mouseup', sidebarResizeState.stopResize);
+            window.removeEventListener('mouseup', sidebarResizeState.stopResize);
+            
+            sidebarResizeState.isResizing = true;
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
             
             // Disable pointer events on any iframes to prevent them capturing mouse
-            const iframes = document.querySelectorAll('iframe');
-            iframes.forEach(iframe => iframe.style.pointerEvents = 'none');
+            sidebarResizeState.iframes = document.querySelectorAll('iframe');
+            sidebarResizeState.iframes.forEach(iframe => iframe.style.pointerEvents = 'none');
             
-            const startX = e.pageX;
-            const startWidth = sidebar.offsetWidth;
+            sidebarResizeState.startX = e.pageX;
+            sidebarResizeState.startWidth = sidebar.offsetWidth;
             
-            function doResize(e) {
-                if (!isResizing) return;
-                const diff = e.pageX - startX;
-                const newWidth = Math.max(200, Math.min(window.innerWidth * 0.5, startWidth + diff));
-                sidebar.style.width = newWidth + 'px';
-            }
-            
-            function stopResize() {
-                isResizing = false;
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-                // Re-enable pointer events on iframes
-                iframes.forEach(iframe => iframe.style.pointerEvents = '');
-                document.removeEventListener('mousemove', doResize);
-                document.removeEventListener('mouseup', stopResize);
-            }
-            
-            document.addEventListener('mousemove', doResize);
-            document.addEventListener('mouseup', stopResize);
+            document.addEventListener('mousemove', sidebarResizeState.doResize);
+            document.addEventListener('mouseup', sidebarResizeState.stopResize);
+            window.addEventListener('mouseup', sidebarResizeState.stopResize);
         });
     }
     
     // Resize handle between editor and preview - will be created when preview is shown
     setupEditorPreviewResize();
 }
+
+// Global state for editor-preview resize
+let editorPreviewResizeState = {
+    isResizing: false,
+    startX: 0,
+    editorStartWidth: 0,
+    containerWidth: 0,
+    editorPane: null,
+    previewPane: null,
+    iframe: null,
+    doResize: null,
+    stopResize: null
+};
 
 // Setup resize handle between editor and preview
 function setupEditorPreviewResize() {
@@ -682,6 +721,15 @@ function setupEditorPreviewResize() {
         existingHandle.remove();
     }
     
+    // Clean up any previous resize state
+    if (editorPreviewResizeState.doResize) {
+        document.removeEventListener('mousemove', editorPreviewResizeState.doResize);
+    }
+    if (editorPreviewResizeState.stopResize) {
+        document.removeEventListener('mouseup', editorPreviewResizeState.stopResize);
+    }
+    editorPreviewResizeState.isResizing = false;
+    
     // Create resize handle
     const handle = document.createElement('div');
     handle.id = 'editor-preview-resize-handle';
@@ -689,49 +737,71 @@ function setupEditorPreviewResize() {
     handle.style.display = previewPane.style.display === 'none' ? 'none' : 'block';
     previewPane.parentNode.insertBefore(handle, previewPane);
     
-    let isResizing = false;
+    // Store references
+    editorPreviewResizeState.editorPane = editorPane;
+    editorPreviewResizeState.previewPane = previewPane;
+    
+    // Define resize functions at module level so they can be properly removed
+    editorPreviewResizeState.doResize = function(e) {
+        // Check if mouse button is still pressed (buttons === 1 means left button)
+        if (!editorPreviewResizeState.isResizing || e.buttons !== 1) {
+            // Mouse button released but we didn't get mouseup event
+            if (editorPreviewResizeState.isResizing) {
+                editorPreviewResizeState.stopResize();
+            }
+            return;
+        }
+        const diff = e.pageX - editorPreviewResizeState.startX;
+        const newEditorWidth = Math.max(200, Math.min(
+            editorPreviewResizeState.containerWidth - 200, 
+            editorPreviewResizeState.editorStartWidth + diff
+        ));
+        const editorPercent = (newEditorWidth / editorPreviewResizeState.containerWidth) * 100;
+        editorPreviewResizeState.editorPane.style.flex = `0 0 ${editorPercent}%`;
+        editorPreviewResizeState.previewPane.style.flex = `1 1 ${100 - editorPercent}%`;
+    };
+    
+    editorPreviewResizeState.stopResize = function() {
+        editorPreviewResizeState.isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        // Re-enable pointer events on iframe
+        if (editorPreviewResizeState.iframe) {
+            editorPreviewResizeState.iframe.style.pointerEvents = '';
+        }
+        document.removeEventListener('mousemove', editorPreviewResizeState.doResize);
+        document.removeEventListener('mouseup', editorPreviewResizeState.stopResize);
+        // Also remove from window in case mouseup happens outside
+        window.removeEventListener('mouseup', editorPreviewResizeState.stopResize);
+    };
     
     handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        isResizing = true;
+        
+        // Clean up any previous listeners first
+        document.removeEventListener('mousemove', editorPreviewResizeState.doResize);
+        document.removeEventListener('mouseup', editorPreviewResizeState.stopResize);
+        window.removeEventListener('mouseup', editorPreviewResizeState.stopResize);
+        
+        editorPreviewResizeState.isResizing = true;
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
         
         // Disable pointer events on iframe to prevent it from capturing mouse events
-        const iframe = previewPane.querySelector('iframe');
-        if (iframe) {
-            iframe.style.pointerEvents = 'none';
+        editorPreviewResizeState.iframe = previewPane.querySelector('iframe');
+        if (editorPreviewResizeState.iframe) {
+            editorPreviewResizeState.iframe.style.pointerEvents = 'none';
         }
         
-        const startX = e.pageX;
-        const editorStartWidth = editorPane.offsetWidth;
-        const previewStartWidth = previewPane.offsetWidth;
-        const containerWidth = editorContainer.offsetWidth;
+        editorPreviewResizeState.startX = e.pageX;
+        editorPreviewResizeState.editorStartWidth = editorPane.offsetWidth;
+        editorPreviewResizeState.containerWidth = editorContainer.offsetWidth;
         
-        function doResize(e) {
-            if (!isResizing) return;
-            const diff = e.pageX - startX;
-            const newEditorWidth = Math.max(200, Math.min(containerWidth - 200, editorStartWidth + diff));
-            const editorPercent = (newEditorWidth / containerWidth) * 100;
-            editorPane.style.flex = `0 0 ${editorPercent}%`;
-            previewPane.style.flex = `1 1 ${100 - editorPercent}%`;
-        }
-        
-        function stopResize() {
-            isResizing = false;
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            // Re-enable pointer events on iframe
-            if (iframe) {
-                iframe.style.pointerEvents = '';
-            }
-            document.removeEventListener('mousemove', doResize);
-            document.removeEventListener('mouseup', stopResize);
-        }
-        
-        document.addEventListener('mousemove', doResize);
-        document.addEventListener('mouseup', stopResize);
+        document.addEventListener('mousemove', editorPreviewResizeState.doResize);
+        document.addEventListener('mouseup', editorPreviewResizeState.stopResize);
+        // Also listen on window for mouseup outside document
+        window.addEventListener('mouseup', editorPreviewResizeState.stopResize);
     });
 }
 
