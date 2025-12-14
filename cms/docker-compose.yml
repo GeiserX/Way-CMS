@@ -7,7 +7,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ../../clvreformas-1-1-5:/var/www/html:ro
+      - ../website:/var/www/html:ro
     environment:
       - CMS_BASE_DIR=/var/www/html
       - CMS_PASSWORD=${CMS_PASSWORD:-}
