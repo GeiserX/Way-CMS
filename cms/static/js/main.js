@@ -566,7 +566,7 @@ function exportSettings() {
         searchHistory: getSearchHistory(),
         previewEnabled: previewEnabled,
         exportedAt: new Date().toISOString(),
-        version: '1.2.0'
+        version: '2.0.0'
     };
     
     const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });

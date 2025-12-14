@@ -15,17 +15,24 @@ services:
 
   # CMS admin interface - using Docker Hub image
   # Note: Set DOCKER_USERNAME env var or replace 'drumsergio' with your Docker Hub username
-  # Set CMS_VERSION env var to use a specific version (defaults to v1.2.14)
-  # Example: CMS_VERSION=v1.2.14 or CMS_VERSION=v1.2.13
+  # Set CMS_VERSION env var to use a specific version (defaults to v2.0.0)
+  # Example: CMS_VERSION=v2.0.0 or CMS_VERSION=v1.2.14
   cms:
-    image: ${DOCKER_USERNAME:-drumsergio}/way-cms:${CMS_VERSION:-v1.2.14}
+    image: ${DOCKER_USERNAME:-drumsergio}/way-cms:${CMS_VERSION:-v2.0.0}
     container_name: way-cms-admin
     ports:
       - "5001:5000"
     volumes:
+      # Single-tenant: website files
       - ${WEBSITE_DIR:-./website}:/var/www/html:rw
+      # Backups directory
       - ./.way-cms-backups:/.way-cms-backups
+      # Multi-tenant: SQLite database and settings
+      - ./.way-cms-data:/.way-cms-data
+      # Multi-tenant: all projects (only used when MULTI_TENANT=true)
+      - ${PROJECTS_DIR:-./projects}:/var/www/projects:rw
     environment:
+      # ============== Single-Tenant Mode (Default) ==============
       # Base directory for website files
       - CMS_BASE_DIR=/var/www/html
       
@@ -34,6 +41,30 @@ services:
       - CMS_PASSWORD=${CMS_PASSWORD:-admin}
       - CMS_PASSWORD_HASH=${CMS_PASSWORD_HASH:-}
       
+      # ============== Multi-Tenant Mode ==============
+      # Set MULTI_TENANT=true to enable multi-tenant mode
+      - MULTI_TENANT=${MULTI_TENANT:-false}
+      
+      # Multi-tenant directories (only used when MULTI_TENANT=true)
+      - DATA_DIR=${DATA_DIR:-/.way-cms-data}
+      - PROJECTS_BASE_DIR=${PROJECTS_BASE_DIR:-/var/www/projects}
+      
+      # Initial admin user (required for first run in multi-tenant mode)
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      
+      # Email configuration for magic links (multi-tenant)
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Way-CMS}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      - MAGIC_LINK_EXPIRY_HOURS=${MAGIC_LINK_EXPIRY_HOURS:-24}
+      - APP_URL=${APP_URL:-http://localhost:5001}
+      
+      # ============== Common Settings ==============
       # Security
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production-please}
       - READ_ONLY_MODE=${READ_ONLY_MODE:-false}
@@ -41,7 +72,7 @@ services:
       # Session configuration (in minutes, default 24 hours)
       - SESSION_TIMEOUT_MINUTES=${SESSION_TIMEOUT_MINUTES:-1440}
       
-      # Website display settings
+      # Website display settings (single-tenant only)
       - WEBSITE_URL=${WEBSITE_URL:-}
       - WEBSITE_NAME=${WEBSITE_NAME:-}
       

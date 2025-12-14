@@ -45,6 +45,11 @@ cms/html/
 *.log
 website/
 
+# Multi-tenant data
+.way-cms-data/
+projects/
+*.db
+
 # Temporary files
 *.tmp
 .way-cms-backups/

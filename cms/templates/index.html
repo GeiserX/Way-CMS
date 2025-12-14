@@ -76,6 +76,38 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     /* Header styles live in static/css/style.css */
+    /* Project selector styles */
+    .project-selector {
+        display: inline-flex;
+        align-items: center;
+    }
+    .project-selector select {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        min-width: 120px;
+    }
+    .project-selector select:focus {
+        outline: none;
+        border-color: var(--accent-color);
+    }
+    .breadcrumb-separator {
+        margin: 0 0.5rem;
+        color: var(--text-secondary);
+    }
+    /* Admin button style */
+    .btn-admin {
+        background: linear-gradient(135deg, #ffd700, #ffb300) !important;
+        color: #333 !important;
+        border: none;
+    }
+    .btn-admin:hover {
+        background: linear-gradient(135deg, #ffb300, #ffd700) !important;
+    }
     /* Three-dot context menu for files */
     .context-menu-btn {
         background: none;
@@ -296,6 +328,9 @@
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showKeyboardShortcuts()" data-overflow-label="⌨️ Shortcuts">⌨️ Shortcuts</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="exportSettings()" data-overflow-label="📤 Export">📤 Export</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="importSettings()" data-overflow-label="📥 Import">📥 Import</button>
+            {% if multi_tenant and is_admin %}
+            <a class="btn btn-admin header-action-btn is-overflowable" href="{{ url_for('admin.admin_panel') }}" data-overflow-label="👑 Admin">👑 Admin</a>
+            {% endif %}
             <a class="btn btn-secondary header-action-btn is-overflowable" href="{{ url_for('logout') }}" data-overflow-label="🚪 Logout">🚪 Logout</a>
         </div>
 
@@ -312,6 +347,18 @@
     <aside class="sidebar">
         <div class="file-browser">
             <div class="breadcrumb" id="breadcrumb" data-folder-name="{{ folder_name }}">
+                {% if multi_tenant and projects|length > 1 %}
+                <div class="project-selector">
+                    <select id="project-select" onchange="switchProject(this.value)">
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if current_project and project.id == current_project.id %}selected{% endif %}>
+                            {{ project.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <span class="breadcrumb-separator">/</span>
+                </div>
+                {% endif %}
                 <span class="breadcrumb-item" onclick="navigateTo('')">{{ folder_name }}</span>
             </div>
             <div class="file-browser-actions" style="padding: 0.5rem;">
@@ -611,6 +658,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closetag.min.js"></script>
 <script>
     const API_BASE = '';
+    const MULTI_TENANT = {{ 'true' if multi_tenant else 'false' }};
     let currentEditor = null;
     let currentFilePath = null;
     let currentPath = '';
@@ -618,5 +666,30 @@
     let renameTarget = null;
     let createType = null;
     let createPath = null;
+    
+    {% if multi_tenant %}
+    // Project switching for multi-tenant mode
+    async function switchProject(projectId) {
+        try {
+            const response = await fetch('/api/switch-project', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ project_id: parseInt(projectId) })
+            });
+            
+            if (response.ok) {
+                // Reload the page to reflect the new project
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                alert('Error switching project: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error switching project: ' + error.message);
+        }
+    }
+    {% endif %}
 </script>
 {% endblock %}

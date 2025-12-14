@@ -23,6 +23,7 @@ A simple, web-accessible CMS for editing HTML/CSS files downloaded from Wayback 
 - **Session Management**: Configurable session timeouts with persistent login
 - **Rate Limiting**: Built-in protection against abuse
 - **Docker Support**: Easy deployment with Docker and Docker Compose
+- **Multi-Tenant Support** (v2.0.0+): Manage multiple projects with multiple users, role-based access control, and magic link authentication
 
 ## Quick Start with Docker (Recommended)
 
@@ -44,7 +45,7 @@ Use `docker-compose.prod.yml` for production:
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-**Note:** The production compose file uses the pre-built image from Docker Hub (`drumsergio/way-cms:latest`). For a specific version, edit `docker-compose.prod.yml` and replace `:latest` with a version tag (e.g., `:v1.2.10`).
+**Note:** The production compose file uses the pre-built image from Docker Hub (`drumsergio/way-cms:latest`). For a specific version, edit `docker-compose.prod.yml` and replace `:latest` with a version tag (e.g., `:v2.0.0` or `:v1.2.14`).
 
 1. **Set up your website directory:**
    - Configure `WEBSITE_DIR` in your `.env` file (see Configuration section)
@@ -268,15 +269,116 @@ docker-compose build --no-cache cms
 docker-compose up -d
 ```
 
+## Multi-Tenant Mode
+
+Way-CMS supports a **multi-tenant mode** for managing multiple websites with multiple users. This is ideal when you need to:
+
+- Manage multiple website projects from a single CMS instance
+- Give clients access to edit only their own projects
+- Have an admin user who can access and manage all projects
+- Send magic link emails for passwordless login
+
+### Enabling Multi-Tenant Mode
+
+1. **Set environment variables** in your `.env` file:
+
+```env
+# Enable multi-tenant mode
+MULTI_TENANT=true
+
+# Initial admin user (required on first run)
+ADMIN_EMAIL=admin@yourcompany.com
+ADMIN_PASSWORD=your-secure-admin-password
+
+# Public URL for magic link emails
+APP_URL=https://cms.yourcompany.com
+
+# Email configuration (required for magic links)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=noreply@yourcompany.com
+SMTP_FROM_NAME=Way-CMS
+
+# Directory for all projects
+PROJECTS_DIR=./projects
+```
+
+2. **Start the services:**
+```bash
+docker-compose up -d
+```
+
+3. **Access the CMS** at http://localhost:5001 and log in with your admin credentials.
+
+### Multi-Tenant Features
+
+#### Admin Panel (👑 Admin button)
+- **Users Tab**: Create/edit/delete users, send magic links
+- **Projects Tab**: Create/edit/delete projects (each project = a folder)
+- **Assignments Tab**: Assign users to projects (users can have access to multiple projects)
+- **Settings Tab**: View email configuration, test SMTP connection, see system stats
+
+#### User Authentication
+- **Magic Links**: Passwordless login via email (recommended)
+- **Password Login**: Users can optionally set a password after first login
+- **Session Management**: Persistent sessions with configurable timeout
+
+#### Project Management
+- Each project is stored in its own folder under `PROJECTS_DIR`
+- Admin users have access to ALL projects
+- Regular users only see projects they're assigned to
+- Project selector dropdown in the header (if user has multiple projects)
+
+### Multi-Tenant Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MULTI_TENANT` | Enable multi-tenant mode | `false` |
+| `PROJECTS_DIR` | Host directory for all project folders | `./projects` |
+| `PROJECTS_BASE_DIR` | Container path for projects | `/var/www/projects` |
+| `DATA_DIR` | Container path for SQLite database | `/.way-cms-data` |
+| `ADMIN_EMAIL` | Initial admin email (first run) | - |
+| `ADMIN_PASSWORD` | Initial admin password (first run) | - |
+| `APP_URL` | Public URL for magic link emails | `http://localhost:5001` |
+| `SMTP_HOST` | SMTP server hostname | - |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USER` | SMTP username | - |
+| `SMTP_PASSWORD` | SMTP password | - |
+| `SMTP_FROM` | Sender email address | - |
+| `SMTP_FROM_NAME` | Sender display name | `Way-CMS` |
+| `SMTP_USE_TLS` | Use TLS for SMTP | `true` |
+| `MAGIC_LINK_EXPIRY_HOURS` | Magic link expiry time | `24` |
+
+### Migration from Single-Tenant
+
+When you enable multi-tenant mode on an existing single-tenant installation:
+
+1. The existing website folder (`CMS_BASE_DIR`) is automatically migrated as the first project
+2. The admin user is created with the credentials from `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+3. The admin is assigned to the migrated project
+
+### Database
+
+Multi-tenant mode uses SQLite for storing:
+- Users (email, name, password hash, admin flag)
+- Projects (name, slug/folder name, website URL)
+- User-Project assignments (many-to-many)
+- Magic links (tokens for passwordless login)
+
+The database is stored at `/.way-cms-data/waycms.db` inside the container.
+
 ## Security Notes
 
 - **Default Setup**: If no password is set, the CMS uses default credentials (`admin`/`admin`). **Always change this in production!**
 - **Production Use**: Always set a strong `CMS_PASSWORD_HASH` and use HTTPS in production
-- **File Permissions**: The CMS can only access files within the `CMS_BASE_DIR` directory
+- **File Permissions**: The CMS can only access files within the `CMS_BASE_DIR` directory (single-tenant) or assigned projects (multi-tenant)
 - **Network Access**: By default, the CMS binds to `0.0.0.0` (all interfaces). Use a reverse proxy with HTTPS in production
 - **Read-Only Mode**: Enable `READ_ONLY_MODE=true` for safe browsing without editing capabilities
 - **Session Security**: Sessions are protected with HTTP-only cookies and SameSite policies
 - **Rate Limiting**: Default limits are 1000 requests per hour, 100 per minute
+- **Multi-Tenant Security**: Each user can only access their assigned projects; admin routes are protected with `@admin_required` decorator
 
 ## License
 

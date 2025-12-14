@@ -77,6 +77,79 @@
         text-align: center;
         box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
     }
+    
+    .success {
+        background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    }
+    
+    .divider {
+        display: flex;
+        align-items: center;
+        margin: 1.5rem 0;
+        color: #888;
+    }
+    
+    .divider::before,
+    .divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #444;
+    }
+    
+    .divider span {
+        padding: 0 1rem;
+        font-size: 0.85rem;
+    }
+    
+    .magic-link-section {
+        margin-top: 1rem;
+    }
+    
+    .magic-link-btn {
+        width: 100%;
+        padding: 0.875rem;
+        font-size: 1rem;
+        background: transparent;
+        border: 2px solid rgba(102, 126, 234, 0.5);
+        color: #667eea;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .magic-link-btn:hover {
+        background: rgba(102, 126, 234, 0.1);
+        border-color: #667eea;
+    }
+    
+    .magic-link-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .password-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        gap: 0.5rem;
+        color: #888;
+        font-size: 0.9rem;
+    }
+    
+    .password-toggle label {
+        cursor: pointer;
+    }
+    
+    .hidden {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
@@ -85,9 +158,89 @@
     <div class="login-box">
         <h1>Way-CMS</h1>
         <p>Login to access the file editor</p>
+        
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
+        
+        {% if success %}
+        <div class="success">{{ success }}</div>
+        {% endif %}
+        
+        {% if multi_tenant %}
+        <!-- Multi-tenant login: Email + Password or Magic Link -->
+        <form method="POST" action="{{ url_for('login') }}" id="login-form">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required autofocus placeholder="Enter your email">
+            </div>
+            
+            <div class="form-group" id="password-field">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" placeholder="Enter password (if set)">
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.875rem; font-size: 1rem; margin-top: 0.5rem;">
+                Login with Password
+            </button>
+        </form>
+        
+        <div class="divider">
+            <span>or</span>
+        </div>
+        
+        <div class="magic-link-section">
+            <button type="button" class="magic-link-btn" id="magic-link-btn" onclick="requestMagicLink()">
+                📧 Send me a login link
+            </button>
+        </div>
+        
+        <script>
+            async function requestMagicLink() {
+                const email = document.getElementById('email').value;
+                if (!email) {
+                    alert('Please enter your email first');
+                    return;
+                }
+                
+                const btn = document.getElementById('magic-link-btn');
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
+                
+                try {
+                    const response = await fetch('/auth/magic-link', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email: email })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        btn.textContent = '✓ Check your email!';
+                        btn.style.borderColor = '#4caf50';
+                        btn.style.color = '#4caf50';
+                    } else {
+                        btn.textContent = 'Failed - Try again';
+                        btn.style.borderColor = '#f44336';
+                        btn.style.color = '#f44336';
+                        btn.disabled = false;
+                        setTimeout(() => {
+                            btn.textContent = '📧 Send me a login link';
+                            btn.style.borderColor = '';
+                            btn.style.color = '';
+                        }, 3000);
+                    }
+                } catch (error) {
+                    btn.textContent = 'Error - Try again';
+                    btn.disabled = false;
+                }
+            }
+        </script>
+        {% else %}
+        <!-- Single-tenant login: Username + Password -->
         <form method="POST" action="{{ url_for('login') }}">
             <div class="form-group">
                 <label for="username">Username:</label>
@@ -99,6 +252,7 @@
             </div>
             <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.875rem; font-size: 1rem; margin-top: 0.5rem;">Login</button>
         </form>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

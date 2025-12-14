@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Way-CMS{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<header class="header">
+    <div class="logo">
+        <img src="{{ url_for('static', filename='images/way-cms-logo.png') }}" alt="Way-CMS" style="height: 40px; margin-right: 0.5rem; vertical-align: middle;">
+        <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 700; font-size: 1.5rem;">Admin Panel</span>
+    </div>
+    <div class="header-actions">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to Editor</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary">🚪 Logout</a>
+    </div>
+</header>
+
+<div class="admin-container">
+    <nav class="admin-tabs">
+        <button class="admin-tab active" data-tab="users">👤 Users</button>
+        <button class="admin-tab" data-tab="projects">📁 Projects</button>
+        <button class="admin-tab" data-tab="assignments">🔗 Assignments</button>
+        <button class="admin-tab" data-tab="settings">⚙️ Settings</button>
+    </nav>
+    
+    <div class="admin-content">
+        <!-- Users Tab -->
+        <div class="tab-content active" id="tab-users">
+            <div class="tab-header">
+                <h2>User Management</h2>
+                <button class="btn btn-primary" onclick="showCreateUserModal()">+ Add User</button>
+            </div>
+            <div class="table-container">
+                <table class="admin-table" id="users-table">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Has Password</th>
+                            <th>Last Login</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody">
+                        <!-- Users loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Projects Tab -->
+        <div class="tab-content" id="tab-projects">
+            <div class="tab-header">
+                <h2>Project Management</h2>
+                <button class="btn btn-primary" onclick="showCreateProjectModal()">+ Add Project</button>
+            </div>
+            <div class="table-container">
+                <table class="admin-table" id="projects-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Slug (Folder)</th>
+                            <th>Website URL</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="projects-tbody">
+                        <!-- Projects loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Assignments Tab -->
+        <div class="tab-content" id="tab-assignments">
+            <div class="tab-header">
+                <h2>User-Project Assignments</h2>
+                <button class="btn btn-primary" onclick="showAssignModal()">+ Assign User</button>
+            </div>
+            <div class="assignments-container">
+                <div class="assignments-grid" id="assignments-grid">
+                    <!-- Assignments loaded via JS -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Tab -->
+        <div class="tab-content" id="tab-settings">
+            <div class="tab-header">
+                <h2>System Settings</h2>
+            </div>
+            <div class="settings-container">
+                <div class="settings-section">
+                    <h3>📧 Email Configuration</h3>
+                    <div class="settings-info" id="email-config-info">
+                        Loading...
+                    </div>
+                    <button class="btn btn-secondary" onclick="testEmailConfig()">Test Connection</button>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>📊 System Statistics</h3>
+                    <div class="stats-grid" id="stats-grid">
+                        <!-- Stats loaded via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal" id="create-user-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New User</h3>
+            <button class="modal-close" onclick="closeModal('create-user-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="user-email">Email:</label>
+                <input type="email" id="user-email" required placeholder="user@example.com">
+            </div>
+            <div class="form-group">
+                <label for="user-name">Name:</label>
+                <input type="text" id="user-name" placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="user-is-admin">
+                    Admin privileges
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="user-projects">Assign to Projects:</label>
+                <select id="user-projects" multiple></select>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="send-welcome-email" checked>
+                    Send welcome email with login link
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('create-user-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createUser()">Create User</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Project Modal -->
+<div class="modal" id="create-project-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Project</h3>
+            <button class="modal-close" onclick="closeModal('create-project-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="project-name">Project Name:</label>
+                <input type="text" id="project-name" required placeholder="My Website">
+            </div>
+            <div class="form-group">
+                <label for="project-slug">Folder Name (slug):</label>
+                <input type="text" id="project-slug" required placeholder="my-website" pattern="[a-z0-9-]+">
+                <small>Lowercase letters, numbers, and hyphens only</small>
+            </div>
+            <div class="form-group">
+                <label for="project-url">Website URL (optional):</label>
+                <input type="url" id="project-url" placeholder="https://example.com">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('create-project-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createProject()">Create Project</button>
+        </div>
+    </div>
+</div>
+
+<!-- Assign User Modal -->
+<div class="modal" id="assign-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Assign User to Project</h3>
+            <button class="modal-close" onclick="closeModal('assign-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="assign-user">Select User:</label>
+                <select id="assign-user"></select>
+            </div>
+            <div class="form-group">
+                <label for="assign-project">Select Project:</label>
+                <select id="assign-project"></select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('assign-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="assignUserToProject()">Assign</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal" id="edit-user-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit User</h3>
+            <button class="modal-close" onclick="closeModal('edit-user-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-user-id">
+            <div class="form-group">
+                <label for="edit-user-email">Email:</label>
+                <input type="email" id="edit-user-email" disabled>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-name">Name:</label>
+                <input type="text" id="edit-user-name" placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="edit-user-is-admin">
+                    Admin privileges
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('edit-user-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="updateUser()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div class="modal" id="edit-project-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Project</h3>
+            <button class="modal-close" onclick="closeModal('edit-project-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-project-id">
+            <div class="form-group">
+                <label for="edit-project-name">Project Name:</label>
+                <input type="text" id="edit-project-name" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-project-slug">Folder Name (slug):</label>
+                <input type="text" id="edit-project-slug" disabled>
+                <small>Cannot be changed after creation</small>
+            </div>
+            <div class="form-group">
+                <label for="edit-project-url">Website URL:</label>
+                <input type="url" id="edit-project-url" placeholder="https://example.com">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('edit-project-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="updateProject()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}
+

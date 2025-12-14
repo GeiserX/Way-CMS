@@ -2,6 +2,7 @@
 """
 Website CMS - A simple web-based editor for HTML/CSS files
 Designed for editing files downloaded from Wayback Archive.
+Supports both single-tenant and multi-tenant modes.
 """
 
 import os
@@ -13,18 +14,27 @@ import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_from_directory, abort, redirect, url_for, session, send_file
+from flask import Flask, render_template, request, jsonify, send_from_directory, abort, redirect, url_for, session, send_file, g
 from werkzeug.utils import secure_filename
 from functools import wraps
 import mimetypes
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-# Configuration - must be defined before app config
+# ============== Multi-Tenant Configuration ==============
+MULTI_TENANT = os.environ.get('MULTI_TENANT', 'false').lower() == 'true'
+DATA_DIR = os.environ.get('DATA_DIR', '/.way-cms-data')
+PROJECTS_BASE_DIR = os.environ.get('PROJECTS_BASE_DIR', '/var/www/projects')
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+
+# ============== Single-Tenant Configuration (Legacy) ==============
 CMS_BASE_DIR = os.environ.get('CMS_BASE_DIR', '/var/www/html')
 CMS_USERNAME = os.environ.get('CMS_USERNAME', 'admin')
 CMS_PASSWORD_HASH = os.environ.get('CMS_PASSWORD_HASH', '')  # bcrypt hash
 CMS_PASSWORD = os.environ.get('CMS_PASSWORD', '')  # Plain password (legacy, will hash it)
+
+# ============== Common Configuration ==============
 BACKUP_DIR = os.environ.get('BACKUP_DIR', '/.way-cms-backups')  # Fixed path for docker mount
 ALLOWED_EXTENSIONS = {'html', 'htm', 'css', 'js', 'txt', 'xml', 'json', 'md', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'zip', 'ico', 'woff', 'woff2', 'ttf', 'eot'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
@@ -68,14 +78,112 @@ except (PermissionError, OSError):
     BACKUP_DIR = tempfile.mkdtemp(prefix='way-cms-backups-')
     Path(BACKUP_DIR).mkdir(parents=True, exist_ok=True)
 
-# Initialize password hash if plain password provided
-if CMS_PASSWORD and not CMS_PASSWORD_HASH:
+# Initialize password hash if plain password provided (single-tenant mode)
+if not MULTI_TENANT and CMS_PASSWORD and not CMS_PASSWORD_HASH:
     try:
         import bcrypt
         CMS_PASSWORD_HASH = bcrypt.hashpw(CMS_PASSWORD.encode(), bcrypt.gensalt()).decode()
     except ImportError:
         # Fallback to simple hash if bcrypt not available
         CMS_PASSWORD_HASH = hashlib.sha256(CMS_PASSWORD.encode()).hexdigest()
+
+# ============== Multi-Tenant Initialization ==============
+if MULTI_TENANT:
+    try:
+        from .database import init_db, create_admin_user, migrate_from_single_tenant, check_db_exists
+        from .admin_routes import admin_bp
+        from .auth_routes import auth_bp
+        from . import auth as mt_auth
+        from .models import Project, User
+        
+        # Check if this is first run (migration scenario)
+        first_run = not check_db_exists()
+        
+        # Initialize database
+        init_db()
+        
+        # Create admin user if configured
+        admin_user = None
+        if ADMIN_EMAIL and ADMIN_PASSWORD:
+            admin_user = create_admin_user(ADMIN_EMAIL, ADMIN_PASSWORD)
+        
+        # Register blueprints
+        app.register_blueprint(admin_bp)
+        app.register_blueprint(auth_bp)
+        
+        # Create projects base directory
+        try:
+            Path(PROJECTS_BASE_DIR).mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError):
+            import tempfile
+            PROJECTS_BASE_DIR = tempfile.mkdtemp(prefix='way-cms-projects-')
+        
+        # Migration: If CMS_BASE_DIR has content, create a project for it
+        if first_run and CMS_BASE_DIR and os.path.exists(CMS_BASE_DIR):
+            # Check if there's actual content (not empty)
+            has_content = any(os.scandir(CMS_BASE_DIR))
+            if has_content:
+                # Generate project name and slug from existing settings or folder name
+                project_name = WEBSITE_NAME or os.path.basename(CMS_BASE_DIR.rstrip('/')) or 'Migrated Website'
+                project_slug = project_name.lower().replace(' ', '-').replace('_', '-')
+                # Clean slug
+                project_slug = re.sub(r'[^a-z0-9-]', '', project_slug)
+                if not project_slug:
+                    project_slug = 'migrated-website'
+                
+                # Check if project already exists
+                existing_project = Project.get_by_slug(project_slug)
+                if not existing_project:
+                    # Create symlink or copy content to new location
+                    new_project_path = os.path.join(PROJECTS_BASE_DIR, project_slug)
+                    if not os.path.exists(new_project_path):
+                        try:
+                            # Try to create a symlink first (preserves disk space)
+                            os.symlink(CMS_BASE_DIR, new_project_path)
+                            print(f"[Migration] Created symlink from {CMS_BASE_DIR} to {new_project_path}")
+                        except (OSError, NotImplementedError):
+                            # Fallback: copy the directory
+                            shutil.copytree(CMS_BASE_DIR, new_project_path)
+                            print(f"[Migration] Copied {CMS_BASE_DIR} to {new_project_path}")
+                    
+                    # Create the project in the database
+                    project = Project.create(
+                        name=project_name,
+                        slug=project_slug,
+                        website_url=WEBSITE_URL or None
+                    )
+                    print(f"[Migration] Created project '{project_name}' (slug: {project_slug})")
+                    
+                    # Assign admin user to this project (admins have access to all, but good for visibility)
+                    if admin_user:
+                        project.assign_user(admin_user.id)
+                        print(f"[Migration] Assigned admin user to project")
+        
+        print(f"[Way-CMS] Multi-tenant mode enabled. Projects dir: {PROJECTS_BASE_DIR}")
+    except ImportError as e:
+        print(f"[Way-CMS] Warning: Could not initialize multi-tenant mode: {e}")
+        MULTI_TENANT = False
+
+
+def get_current_base_dir():
+    """Get the current base directory for file operations.
+    In multi-tenant mode, returns the current project's directory.
+    In single-tenant mode, returns CMS_BASE_DIR.
+    """
+    if MULTI_TENANT:
+        project_slug = session.get('current_project_slug')
+        if project_slug:
+            return os.path.join(PROJECTS_BASE_DIR, project_slug)
+    return CMS_BASE_DIR
+
+
+def get_current_backup_dir():
+    """Get the backup directory for the current project/site."""
+    if MULTI_TENANT:
+        project_slug = session.get('current_project_slug')
+        if project_slug:
+            return os.path.join(BACKUP_DIR, project_slug)
+    return BACKUP_DIR
 
 
 def verify_password(password, password_hash):
@@ -97,11 +205,27 @@ def allowed_file(filename):
 
 
 def login_required(f):
-    """Decorator to require login if password is set."""
+    """Decorator to require login.
+    Works in both single-tenant and multi-tenant modes.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if (CMS_PASSWORD_HASH or CMS_PASSWORD) and not session.get('logged_in'):
-            return redirect(url_for('login'))
+        if MULTI_TENANT:
+            # Multi-tenant: check for user_id in session
+            if not session.get('user_id'):
+                if request.is_json or request.headers.get('Accept') == 'application/json':
+                    return jsonify({'error': 'Authentication required'}), 401
+                return redirect(url_for('login'))
+            # Also check if a project is selected
+            if not session.get('current_project_id'):
+                # User logged in but no project selected - redirect to select one
+                if request.is_json or request.headers.get('Accept') == 'application/json':
+                    return jsonify({'error': 'No project selected'}), 400
+                return redirect(url_for('index'))
+        else:
+            # Single-tenant: check for logged_in flag
+            if (CMS_PASSWORD_HASH or CMS_PASSWORD) and not session.get('logged_in'):
+                return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -122,9 +246,13 @@ def has_auth_configured():
 
 
 def safe_path(file_path):
-    """Ensure path is within base directory - security hardened."""
+    """Ensure path is within base directory - security hardened.
+    Uses the current project directory in multi-tenant mode.
+    """
+    base_dir = get_current_base_dir()
+    
     if not file_path:
-        return os.path.abspath(CMS_BASE_DIR)
+        return os.path.abspath(base_dir)
     
     # Normalize the path - remove any .. or . components
     # Use os.path.normpath but then verify it's still within base
@@ -134,9 +262,9 @@ def safe_path(file_path):
     normalized = normalized.lstrip('/').lstrip('.')
     
     # Join with base directory
-    full_path = os.path.join(CMS_BASE_DIR, normalized)
+    full_path = os.path.join(base_dir, normalized)
     full_path = os.path.abspath(full_path)
-    base_path = os.path.abspath(CMS_BASE_DIR)
+    base_path = os.path.abspath(base_dir)
     
     # Critical security check: ensure resolved path is within base
     if not full_path.startswith(base_path + os.sep) and full_path != base_path:
@@ -170,50 +298,124 @@ def create_backup(file_path):
 @login_required
 def index():
     """Main page showing file browser."""
-    # Get the folder name from environment variable or base directory
-    if WEBSITE_NAME:
-        folder_name = WEBSITE_NAME
+    base_dir = get_current_base_dir()
+    
+    if MULTI_TENANT:
+        # Multi-tenant: get info from current project
+        from .models import Project
+        project = Project.get_by_id(session.get('current_project_id'))
+        if project:
+            folder_name = project.name
+            website_url = project.website_url or ''
+        else:
+            folder_name = 'No Project'
+            website_url = ''
+        
+        # Get user info and projects list for template
+        from .auth import get_current_user
+        user = get_current_user()
+        projects = user.get_projects() if user else []
+        
+        return render_template('index.html', 
+                             base_dir=base_dir, 
+                             folder_name=folder_name, 
+                             website_url=website_url,
+                             multi_tenant=True,
+                             user=user,
+                             projects=projects,
+                             current_project=project,
+                             is_admin=user.is_admin if user else False)
     else:
-        folder_name = os.path.basename(CMS_BASE_DIR.rstrip('/')) or os.path.basename(os.path.dirname(CMS_BASE_DIR)) or 'Website'
-    return render_template('index.html', base_dir=CMS_BASE_DIR, folder_name=folder_name, website_url=WEBSITE_URL)
+        # Single-tenant: use environment variables
+        if WEBSITE_NAME:
+            folder_name = WEBSITE_NAME
+        else:
+            folder_name = os.path.basename(CMS_BASE_DIR.rstrip('/')) or os.path.basename(os.path.dirname(CMS_BASE_DIR)) or 'Website'
+        return render_template('index.html', 
+                             base_dir=base_dir, 
+                             folder_name=folder_name, 
+                             website_url=WEBSITE_URL,
+                             multi_tenant=False)
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page with username and password."""
-    if not has_auth_configured():
-        session['logged_in'] = True
-        return redirect(url_for('index'))
-    
-    if request.method == 'POST':
-        username = request.form.get('username', '')
-        password = request.form.get('password', '')
-        
-        # Check username
-        if username != CMS_USERNAME:
-            return render_template('login.html', error='Invalid username or password')
-        
-        # Check password
-        if CMS_PASSWORD_HASH:
-            if verify_password(password, CMS_PASSWORD_HASH):
-                session['logged_in'] = True
-                session['username'] = username
-                return redirect(url_for('index'))
-        elif password == CMS_PASSWORD:
-            session['logged_in'] = True
-            session['username'] = username
-            session.permanent = True  # Make session permanent (use cookie expiration)
+    if MULTI_TENANT:
+        # Multi-tenant: use database authentication
+        if session.get('user_id'):
             return redirect(url_for('index'))
         
-        return render_template('login.html', error='Invalid username or password')
-    
-    return render_template('login.html')
+        if request.method == 'POST':
+            email = request.form.get('email', '').strip().lower()
+            password = request.form.get('password', '')
+            
+            if not email:
+                return render_template('login.html', error='Email is required', multi_tenant=True)
+            
+            from .models import User
+            from .auth import login_user as mt_login_user
+            
+            user = User.get_by_email(email)
+            if not user:
+                return render_template('login.html', error='Invalid email or password', multi_tenant=True)
+            
+            if password:
+                # Password authentication
+                if not user.has_password():
+                    return render_template('login.html', 
+                                         error='No password set. Use magic link to login.',
+                                         multi_tenant=True)
+                if not user.check_password(password):
+                    return render_template('login.html', error='Invalid email or password', multi_tenant=True)
+                
+                mt_login_user(user)
+                return redirect(url_for('index'))
+            else:
+                # Request magic link
+                return render_template('login.html', 
+                                     error='Please enter your password or request a magic link',
+                                     multi_tenant=True)
+        
+        return render_template('login.html', multi_tenant=True)
+    else:
+        # Single-tenant: legacy authentication
+        if not has_auth_configured():
+            session['logged_in'] = True
+            return redirect(url_for('index'))
+        
+        if request.method == 'POST':
+            username = request.form.get('username', '')
+            password = request.form.get('password', '')
+            
+            # Check username
+            if username != CMS_USERNAME:
+                return render_template('login.html', error='Invalid username or password')
+            
+            # Check password
+            if CMS_PASSWORD_HASH:
+                if verify_password(password, CMS_PASSWORD_HASH):
+                    session['logged_in'] = True
+                    session['username'] = username
+                    return redirect(url_for('index'))
+            elif password == CMS_PASSWORD:
+                session['logged_in'] = True
+                session['username'] = username
+                session.permanent = True  # Make session permanent (use cookie expiration)
+                return redirect(url_for('index'))
+            
+            return render_template('login.html', error='Invalid username or password')
+        
+        return render_template('login.html')
 
 
 @app.route('/logout')
 def logout():
     """Logout."""
-    session.pop('logged_in', None)
+    if MULTI_TENANT:
+        session.clear()
+    else:
+        session.pop('logged_in', None)
     return redirect(url_for('login'))
 
 
@@ -667,7 +869,8 @@ def preview_assets(asset_path):
             abort(404)
     
     # Security: Double-check path is within base directory
-    if not os.path.abspath(full_path).startswith(os.path.abspath(CMS_BASE_DIR)):
+    base_dir = get_current_base_dir()
+    if not os.path.abspath(full_path).startswith(os.path.abspath(base_dir)):
         abort(403)
     
     # Determine MIME type with proper charset for text files
@@ -826,7 +1029,7 @@ def list_files():
                 continue  # Skip backup directories
             
             item_path = os.path.join(full_path, item)
-            rel_path = os.path.relpath(item_path, CMS_BASE_DIR)
+            rel_path = os.path.relpath(item_path, get_current_base_dir())
             
             item_info = {
                 'name': item,
@@ -1035,13 +1238,14 @@ def search_files():
     
     try:
         import fnmatch
-        for root, dirs, files in os.walk(CMS_BASE_DIR):
+        base_dir = get_current_base_dir()
+        for root, dirs, files in os.walk(base_dir):
             dirs[:] = [d for d in dirs if not d.startswith('.way-cms')]
             
             for file in files:
                 if fnmatch.fnmatch(file, file_pattern):
                     file_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(file_path, CMS_BASE_DIR).replace('\\', '/')
+                    rel_path = os.path.relpath(file_path, base_dir).replace('\\', '/')
                     
                     if allowed_file(file) or file.startswith('.'):
                         try:
@@ -1111,12 +1315,13 @@ def search_replace():
     if not files_to_process:
         # Find all matching files
         import fnmatch
-        for root, dirs, files in os.walk(CMS_BASE_DIR):
+        base_dir = get_current_base_dir()
+        for root, dirs, files in os.walk(base_dir):
             dirs[:] = [d for d in dirs if not d.startswith('.way-cms')]
             for file in files:
                 if fnmatch.fnmatch(file, file_pattern):
                     file_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(file_path, CMS_BASE_DIR).replace('\\', '/')
+                    rel_path = os.path.relpath(file_path, base_dir).replace('\\', '/')
                     if allowed_file(file):
                         files_to_process.append(rel_path)
     
@@ -1547,7 +1752,7 @@ def download_folder_zip():
                         for file in files:
                             file_path = os.path.join(root, file)
                             # Calculate relative path from base directory
-                            arcname = os.path.relpath(file_path, CMS_BASE_DIR)
+                            arcname = os.path.relpath(file_path, get_current_base_dir())
                             zip_file.write(file_path, arcname)
             
             # Send the file and delete after
@@ -1631,13 +1836,14 @@ def upload_zip():
             tmp_path = tmp_file.name
         
         # Determine extraction directory
+        base_dir = get_current_base_dir()
         if extract_path:
             extract_to = safe_path(extract_path)
             if not extract_to:
                 os.unlink(tmp_path)
                 return jsonify({'error': 'Invalid extraction path'}), 400
         else:
-            extract_to = CMS_BASE_DIR
+            extract_to = base_dir
         
         # Create extraction directory if needed
         Path(extract_to).mkdir(parents=True, exist_ok=True)
@@ -1649,7 +1855,7 @@ def upload_zip():
             for member in zip_ref.namelist():
                 # Prevent zip slip vulnerability
                 member_path = os.path.join(extract_to, member)
-                if not os.path.abspath(member_path).startswith(os.path.abspath(CMS_BASE_DIR)):
+                if not os.path.abspath(member_path).startswith(os.path.abspath(base_dir)):
                     os.unlink(tmp_path)
                     return jsonify({'error': 'Invalid file path in ZIP'}), 400
             
@@ -1699,17 +1905,18 @@ def upload_file():
     
     try:
         # Determine upload directory
+        base_dir = get_current_base_dir()
         if upload_path:
             upload_to = safe_path(upload_path)
             if not upload_to or not os.path.isdir(upload_to):
                 return jsonify({'error': 'Invalid upload path'}), 400
         else:
-            upload_to = CMS_BASE_DIR
+            upload_to = base_dir
         
         # Secure filename
         filename = secure_filename(file.filename)
         target_path = os.path.join(upload_to, filename)
-        target_path = safe_path(os.path.relpath(target_path, CMS_BASE_DIR))
+        target_path = safe_path(os.path.relpath(target_path, base_dir))
         
         if not target_path:
             return jsonify({'error': 'Invalid target path'}), 400
@@ -1720,23 +1927,90 @@ def upload_file():
         
         return jsonify({
             'success': True,
-            'path': os.path.relpath(target_path, CMS_BASE_DIR),
+            'path': os.path.relpath(target_path, base_dir),
             'size': file_size
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/my-projects', methods=['GET'])
+@login_required
+def get_my_projects():
+    """API endpoint to get current user's projects (multi-tenant only)."""
+    if not MULTI_TENANT:
+        return jsonify({'error': 'Not in multi-tenant mode'}), 400
+    
+    from .auth import get_current_user
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    projects = user.get_projects()
+    current_project_id = session.get('current_project_id')
+    
+    return jsonify({
+        'projects': [p.to_dict() for p in projects],
+        'current_project_id': current_project_id
+    })
+
+
+@app.route('/api/switch-project', methods=['POST'])
+@login_required
+def switch_project():
+    """API endpoint to switch to a different project (multi-tenant only)."""
+    if not MULTI_TENANT:
+        return jsonify({'error': 'Not in multi-tenant mode'}), 400
+    
+    from .auth import get_current_user, set_current_project
+    from .models import Project
+    
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    project_id = data.get('project_id')
+    
+    if not project_id:
+        return jsonify({'error': 'project_id is required'}), 400
+    
+    project = Project.get_by_id(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    
+    if not user.has_access_to_project(project_id):
+        return jsonify({'error': 'Access denied to this project'}), 403
+    
+    set_current_project(project)
+    
+    return jsonify({
+        'success': True,
+        'project': project.to_dict()
+    })
+
+
 @app.route('/api/config', methods=['GET'])
 @login_required
 def get_config():
     """API endpoint to get system configuration (for frontend)."""
-    return jsonify({
+    config = {
         'read_only': READ_ONLY_MODE,
         'session_timeout': SESSION_TIMEOUT_MINUTES,
         'allowed_extensions': list(ALLOWED_EXTENSIONS),
-        'max_file_size': MAX_FILE_SIZE
-    })
+        'max_file_size': MAX_FILE_SIZE,
+        'multi_tenant': MULTI_TENANT
+    }
+    
+    if MULTI_TENANT:
+        from .auth import get_current_user, get_current_project
+        user = get_current_user()
+        project = get_current_project()
+        config['user'] = user.to_dict() if user else None
+        config['current_project'] = project.to_dict() if project else None
+        config['is_admin'] = user.is_admin if user else False
+    
+    return jsonify(config)
 
 
 # Catch-all route for serving assets directly from website directory
@@ -1752,8 +2026,9 @@ def serve_asset_fallback(asset_path):
     if not full_path or not os.path.exists(full_path) or not os.path.isfile(full_path):
         abort(404)
     
-    # Security: ensure within CMS_BASE_DIR
-    if not os.path.abspath(full_path).startswith(os.path.abspath(CMS_BASE_DIR)):
+    # Security: ensure within base directory
+    base_dir = get_current_base_dir()
+    if not os.path.abspath(full_path).startswith(os.path.abspath(base_dir)):
         abort(403)
     
     # Determine MIME type
@@ -1814,39 +2089,52 @@ def serve_asset_fallback(asset_path):
 AUTO_BACKUP_ENABLED = os.environ.get('AUTO_BACKUP_ENABLED', 'true').lower() == 'true'
 AUTO_BACKUP_DIR = os.path.join(BACKUP_DIR, 'auto')
 
-def get_website_name_for_backup():
+def get_website_name_for_backup(project_slug=None):
     """Get website name for backup filename."""
+    if project_slug:
+        return re.sub(r'[^a-zA-Z0-9_-]', '_', project_slug)
     if WEBSITE_NAME:
         # Sanitize for filename
         return re.sub(r'[^a-zA-Z0-9_-]', '_', WEBSITE_NAME)
     return os.path.basename(CMS_BASE_DIR.rstrip('/')) or 'website'
 
-def create_automatic_backup():
-    """Create an automatic backup of the entire website directory."""
+def create_automatic_backup(project_slug=None, base_dir=None):
+    """Create an automatic backup of a website directory.
+    In multi-tenant mode, backs up a specific project.
+    In single-tenant mode, backs up CMS_BASE_DIR.
+    """
     if not AUTO_BACKUP_ENABLED:
         print("[AutoBackup] Automatic backups disabled")
         return None
     
+    # Determine backup directory
+    if base_dir is None:
+        base_dir = CMS_BASE_DIR
+    
+    backup_dir = AUTO_BACKUP_DIR
+    if project_slug:
+        backup_dir = os.path.join(BACKUP_DIR, project_slug, 'auto')
+    
     try:
         import zipfile
         
-        print(f"[AutoBackup] Creating backup... BACKUP_DIR={BACKUP_DIR}, AUTO_BACKUP_DIR={AUTO_BACKUP_DIR}")
+        print(f"[AutoBackup] Creating backup... base_dir={base_dir}, backup_dir={backup_dir}")
         
         # Create auto backup directory
-        os.makedirs(AUTO_BACKUP_DIR, exist_ok=True)
-        print(f"[AutoBackup] Directory created/exists: {AUTO_BACKUP_DIR}")
+        os.makedirs(backup_dir, exist_ok=True)
+        print(f"[AutoBackup] Directory created/exists: {backup_dir}")
         
         # Generate backup filename with timestamp
-        website_name = get_website_name_for_backup()
+        website_name = get_website_name_for_backup(project_slug)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         backup_filename = f"{website_name}_{timestamp}.zip"
-        backup_path = os.path.join(AUTO_BACKUP_DIR, backup_filename)
+        backup_path = os.path.join(backup_dir, backup_filename)
         print(f"[AutoBackup] Creating backup at: {backup_path}")
         
         # Create ZIP backup
         with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            if os.path.isdir(CMS_BASE_DIR):
-                for root, dirs, files in os.walk(CMS_BASE_DIR):
+            if os.path.isdir(base_dir):
+                for root, dirs, files in os.walk(base_dir):
                     # Skip backup directories
                     dirs[:] = [d for d in dirs if not d.startswith('.way-cms')]
                     
@@ -1854,7 +2142,7 @@ def create_automatic_backup():
                         file_path = os.path.join(root, file)
                         try:
                             # Relative path within the archive
-                            arcname = os.path.relpath(file_path, CMS_BASE_DIR)
+                            arcname = os.path.relpath(file_path, base_dir)
                             zip_file.write(file_path, arcname)
                         except (OSError, IOError) as e:
                             # Skip files that can't be read (permissions, etc.)
