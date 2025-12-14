@@ -1,14 +1,18 @@
 services:
   # Public website served via nginx
   website:
-    image: nginx:1.28-alpine
+    image: nginx:1.29-alpine
     container_name: way-cms-website
     ports:
-      - "8080:80"
+      - "${WEBSITE_PORT:-8080}:80"
     volumes:
+      # Single-tenant: website files
       - ${WEBSITE_DIR:-./website}:/usr/share/nginx/html:ro
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Multi-tenant: project-specific website (override WEBSITE_DIR per project)
+      - ${PROJECTS_DIR:-./projects}:/var/www/projects:ro
+      # Nginx configuration
+      - ${NGINX_CONF_DIR:-./nginx}/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${NGINX_CONF_DIR:-./nginx}/default.conf:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped
     networks:
       - way-cms-network
@@ -20,16 +24,17 @@ services:
       dockerfile: Dockerfile
     container_name: way-cms-admin
     ports:
-      - "5001:5000"
+      - "${CMS_PORT:-5001}:5000"
     # Override CMD for development - use Flask dev server
+    # In production, use: image: drumsergio/way-cms:latest (see docker-compose.prod.yml)
     command: python app.py
     volumes:
       # Single-tenant: website files
       - ${WEBSITE_DIR:-./website}:/var/www/html:rw
-      # Backups directory
-      - ./.way-cms-backups:/.way-cms-backups
+      # Backups directory (project-specific backups go here: BACKUP_DIR/project-slug/auto/)
+      - ${BACKUP_DIR:-./.way-cms-backups}:/.way-cms-backups:rw
       # Multi-tenant: SQLite database and settings
-      - ./.way-cms-data:/.way-cms-data
+      - ${DATA_DIR:-./.way-cms-data}:/.way-cms-data:rw
       # Multi-tenant: all projects (only used when MULTI_TENANT=true)
       - ${PROJECTS_DIR:-./projects}:/var/www/projects:rw
     environment:
@@ -57,11 +62,13 @@ services:
       # Email configuration for magic links (multi-tenant)
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
+      # Note: Port 465 uses SSL (set SMTP_USE_TLS=false), Port 587 uses TLS (set SMTP_USE_TLS=true)
+      # If SMTP_USE_TLS is not set, it auto-detects: 465=false, 587=true
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM=${SMTP_FROM:-}
       - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Way-CMS}
-      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-}
       - MAGIC_LINK_EXPIRY_HOURS=${MAGIC_LINK_EXPIRY_HOURS:-24}
       - APP_URL=${APP_URL:-http://localhost:5001}
       

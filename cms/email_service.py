@@ -15,14 +15,24 @@ class EmailConfig:
     
     @classmethod
     def get_config(cls) -> dict:
+        port = int(os.environ.get('SMTP_PORT', '587'))
+        # Port 465 uses SSL (not TLS), port 587 uses TLS
+        # Auto-detect if not explicitly set
+        use_tls_env = os.environ.get('SMTP_USE_TLS', '').lower()
+        if use_tls_env:
+            use_tls = use_tls_env == 'true'
+        else:
+            # Auto-detect: 465 = SSL (false), 587 = TLS (true)
+            use_tls = port != 465
+        
         return {
             'host': os.environ.get('SMTP_HOST', ''),
-            'port': int(os.environ.get('SMTP_PORT', '587')),
+            'port': port,
             'user': os.environ.get('SMTP_USER', ''),
             'password': os.environ.get('SMTP_PASSWORD', ''),
             'from_email': os.environ.get('SMTP_FROM', ''),
             'from_name': os.environ.get('SMTP_FROM_NAME', 'Way-CMS'),
-            'use_tls': os.environ.get('SMTP_USE_TLS', 'true').lower() == 'true',
+            'use_tls': use_tls,
         }
     
     @classmethod
@@ -60,10 +70,12 @@ class EmailService:
             msg.attach(MIMEText(html_body, 'html'))
             
             # Connect and send
+            # Port 465 uses SSL (SMTP_SSL), Port 587 uses TLS (SMTP + starttls)
             if self.config['use_tls']:
                 server = smtplib.SMTP(self.config['host'], self.config['port'])
                 server.starttls()
             else:
+                # Port 465 or explicit SSL
                 server = smtplib.SMTP_SSL(self.config['host'], self.config['port'])
             
             server.login(self.config['user'], self.config['password'])
@@ -204,10 +216,12 @@ This link expires in 24 hours and can only be used once.
             return False, 'Email is not configured. Please set SMTP environment variables.'
         
         try:
+            # Port 465 uses SSL (SMTP_SSL), Port 587 uses TLS (SMTP + starttls)
             if self.config['use_tls']:
                 server = smtplib.SMTP(self.config['host'], self.config['port'])
                 server.starttls()
             else:
+                # Port 465 or explicit SSL
                 server = smtplib.SMTP_SSL(self.config['host'], self.config['port'])
             
             server.login(self.config['user'], self.config['password'])
