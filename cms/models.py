@@ -148,14 +148,24 @@ class User:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
+        # Handle created_at - may be string from SQLite or datetime object
+        if self.created_at:
+            created_at = self.created_at if isinstance(self.created_at, str) else self.created_at.isoformat()
+        else:
+            created_at = None
+        # Handle last_login - may be string from SQLite or datetime object
+        if self.last_login:
+            last_login = self.last_login if isinstance(self.last_login, str) else self.last_login.isoformat()
+        else:
+            last_login = None
         return {
             'id': self.id,
             'email': self.email,
             'name': self.name,
             'is_admin': self.is_admin,
             'has_password': self.has_password(),
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'created_at': created_at,
+            'last_login': last_login
         }
 
 
@@ -275,12 +285,17 @@ class Project:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
+        # Handle created_at - may be string from SQLite or datetime object
+        if self.created_at:
+            created_at = self.created_at if isinstance(self.created_at, str) else self.created_at.isoformat()
+        else:
+            created_at = None
         return {
             'id': self.id,
             'name': self.name,
             'slug': self.slug,
             'website_url': self.website_url,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': created_at
         }
 
 
