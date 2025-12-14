@@ -40,12 +40,17 @@ def create_user():
     
     email = data.get('email', '').strip().lower()
     name = data.get('name', '').strip()
+    password = data.get('password', '').strip()
     is_admin = data.get('is_admin', False)
     project_ids = data.get('project_ids', [])
     send_welcome_email = data.get('send_welcome_email', True)
     
     if not email:
         return jsonify({'error': 'Email is required'}), 400
+    
+    # Require password if not sending welcome email
+    if not send_welcome_email and not password:
+        return jsonify({'error': 'Password is required when not sending welcome email'}), 400
     
     # Check if user already exists
     existing = User.get_by_email(email)
@@ -54,6 +59,10 @@ def create_user():
     
     # Create user
     user = User.create(email=email, name=name, is_admin=is_admin)
+    
+    # Set password if provided
+    if password:
+        user.set_password(password)
     
     # Assign projects
     for project_id in project_ids:

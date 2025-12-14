@@ -733,21 +733,30 @@ function navigateTo(path) {
 
 function updateBreadcrumb(path) {
     const breadcrumbEl = document.getElementById('breadcrumb');
+    if (!breadcrumbEl) {
+        console.warn('breadcrumb element not found, skipping updateBreadcrumb');
+        return;
+    }
     const parts = path.split('/').filter(p => p);
     
     // Get folder name from data attribute or use default
     const folderName = breadcrumbEl.dataset.folderName || 'Root';
-    breadcrumbEl.innerHTML = `<span class="breadcrumb-item" onclick="navigateTo('')">${escapeHtml(folderName)}</span>`;
     
-    let currentPath = '';
+    // Preserve project selector if it exists (important for multi-tenant)
+    const projectSelector = breadcrumbEl.querySelector('.project-selector');
+    const projectSelectorHTML = projectSelector ? projectSelector.outerHTML : '';
+    
+    // Build new breadcrumb content
+    let html = projectSelectorHTML + `<span class="breadcrumb-item" onclick="navigateTo('')">${escapeHtml(folderName)}</span>`;
+    
+    let currentPathBuild = '';
     parts.forEach((part, index) => {
-        currentPath += (currentPath ? '/' : '') + part;
-        const span = document.createElement('span');
-        span.className = 'breadcrumb-item';
-        span.textContent = ' / ' + part;
-        span.onclick = () => navigateTo(currentPath);
-        breadcrumbEl.appendChild(span);
+        currentPathBuild += (currentPathBuild ? '/' : '') + part;
+        const escapedPath = currentPathBuild.replace(/'/g, "\\'");
+        html += `<span class="breadcrumb-item" onclick="navigateTo('${escapedPath}')"> / ${escapeHtml(part)}</span>`;
     });
+    
+    breadcrumbEl.innerHTML = html;
 }
 
 function loadFiles(path, targetEl = null) {

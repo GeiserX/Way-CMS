@@ -99,14 +99,16 @@
         margin: 0 0.5rem;
         color: var(--text-secondary);
     }
-    /* Admin button style */
+    /* Admin button style - purple like logo */
     .btn-admin {
-        background: linear-gradient(135deg, #ffd700, #ffb300) !important;
-        color: #333 !important;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: #fff !important;
         border: none;
+        font-weight: 600;
     }
     .btn-admin:hover {
-        background: linear-gradient(135deg, #ffb300, #ffd700) !important;
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
     /* Three-dot context menu for files */
     .context-menu-btn {
@@ -323,6 +325,9 @@
     <div class="header-actions" id="header-actions">
         <div class="header-actions-main" id="header-actions-main">
             <!-- ALL buttons - overflow into ☰ menu when space is limited -->
+            {% if multi_tenant and is_admin %}
+            <a class="btn btn-admin header-action-btn is-overflowable" href="{{ url_for('admin.admin_panel') }}" data-overflow-label="👑 Admin">👑 Admin</a>
+            {% endif %}
             <button class="btn btn-primary header-action-btn is-overflowable" onclick="downloadCurrentFolder()" data-overflow-label="📦 ZIP Export">📦 ZIP Export</button>
             <button class="btn btn-primary header-action-btn is-overflowable" onclick="showUploadZipDialog()" data-overflow-label="📤 ZIP Import">📤 ZIP Import</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="toggleSearch()" data-overflow-label="🔍 Search">🔍 Search</button>
@@ -335,9 +340,6 @@
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="showKeyboardShortcuts()" data-overflow-label="⌨️ Shortcuts">⌨️ Shortcuts</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="exportSettings()" data-overflow-label="📤 Export">📤 Export</button>
             <button class="btn btn-secondary header-action-btn is-overflowable" onclick="importSettings()" data-overflow-label="📥 Import">📥 Import</button>
-            {% if multi_tenant and is_admin %}
-            <a class="btn btn-admin header-action-btn is-overflowable" href="{{ url_for('admin.admin_panel') }}" data-overflow-label="👑 Admin">👑 Admin</a>
-            {% endif %}
             <a class="btn btn-secondary header-action-btn is-overflowable" href="{{ url_for('logout') }}" data-overflow-label="🚪 Logout">🚪 Logout</a>
         </div>
 

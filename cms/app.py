@@ -186,12 +186,18 @@ if MULTI_TENANT:
 def get_current_base_dir():
     """Get the current base directory for file operations.
     In multi-tenant mode, returns the current project's directory.
+    If project has a /web subfolder, returns that instead (common structure).
     In single-tenant mode, returns CMS_BASE_DIR.
     """
     if MULTI_TENANT:
         project_slug = session.get('current_project_slug')
         if project_slug:
-            return os.path.join(PROJECTS_BASE_DIR, project_slug)
+            project_dir = os.path.join(PROJECTS_BASE_DIR, project_slug)
+            # Check for common /web subfolder structure
+            web_dir = os.path.join(project_dir, 'web')
+            if os.path.isdir(web_dir):
+                return web_dir
+            return project_dir
     return CMS_BASE_DIR
 
 

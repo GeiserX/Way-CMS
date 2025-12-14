@@ -130,21 +130,26 @@
                 <label for="user-name">Name:</label>
                 <input type="text" id="user-name" placeholder="John Doe">
             </div>
-            <div class="form-group">
-                <label>
+            <div class="form-group checkbox-group">
+                <label class="checkbox-label">
                     <input type="checkbox" id="user-is-admin">
-                    Admin privileges
+                    <span>Admin privileges</span>
                 </label>
             </div>
             <div class="form-group">
                 <label for="user-projects">Assign to Projects:</label>
                 <select id="user-projects" multiple></select>
+                <small>Hold Ctrl/Cmd to select multiple</small>
             </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="send-welcome-email" checked>
-                    Send welcome email with login link
+            <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="send-welcome-email" checked onchange="togglePasswordField()">
+                    <span>Send welcome email with magic link</span>
                 </label>
+            </div>
+            <div class="form-group" id="password-group" style="display: none;">
+                <label for="user-password">Password (required if not sending email):</label>
+                <input type="password" id="user-password" placeholder="Enter password">
             </div>
         </div>
         <div class="modal-footer">

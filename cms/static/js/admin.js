@@ -95,12 +95,30 @@ function renderUsers() {
     `).join('');
 }
 
+function togglePasswordField() {
+    const sendWelcome = document.getElementById('send-welcome-email').checked;
+    const passwordGroup = document.getElementById('password-group');
+    const passwordInput = document.getElementById('user-password');
+    
+    if (sendWelcome) {
+        passwordGroup.style.display = 'none';
+        passwordInput.removeAttribute('required');
+    } else {
+        passwordGroup.style.display = 'block';
+        passwordInput.setAttribute('required', 'required');
+    }
+}
+
 function showCreateUserModal() {
     // Reset form
     document.getElementById('user-email').value = '';
     document.getElementById('user-name').value = '';
     document.getElementById('user-is-admin').checked = false;
     document.getElementById('send-welcome-email').checked = true;
+    document.getElementById('user-password').value = '';
+    
+    // Reset password field visibility
+    togglePasswordField();
     
     // Populate projects select
     const select = document.getElementById('user-projects');
@@ -116,12 +134,19 @@ async function createUser() {
     const name = document.getElementById('user-name').value.trim();
     const isAdmin = document.getElementById('user-is-admin').checked;
     const sendWelcome = document.getElementById('send-welcome-email').checked;
+    const password = document.getElementById('user-password').value;
     
     const projectSelect = document.getElementById('user-projects');
     const projectIds = Array.from(projectSelect.selectedOptions).map(o => parseInt(o.value));
     
     if (!email) {
         showToast('Email is required', 'error');
+        return;
+    }
+    
+    // Require password if not sending welcome email
+    if (!sendWelcome && !password) {
+        showToast('Password is required when not sending welcome email', 'error');
         return;
     }
     
@@ -132,6 +157,7 @@ async function createUser() {
             body: JSON.stringify({
                 email,
                 name,
+                password: password || undefined,
                 is_admin: isAdmin,
                 project_ids: projectIds,
                 send_welcome_email: sendWelcome
