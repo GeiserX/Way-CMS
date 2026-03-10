@@ -1,10 +1,21 @@
-# Way-CMS
+<p align="center">
+  <img src="docs/images/banner.svg" alt="Way-CMS banner" width="900">
+</p>
 
-<div align="center">
-  <img src="cms/static/images/way-cms-logo.png" alt="Way-CMS Logo" width="350">
-</div>
+<p align="center">
+  <img src="cms/static/images/way-cms-logo.png" width="150" alt="Way-CMS">
+</p>
 
-A simple, web-accessible CMS for editing HTML/CSS files downloaded from Wayback Archive. This tool allows you to self-service edit your archived website files through a modern web interface with real-time preview.
+<h1 align="center">Way-CMS</h1>
+
+<p align="center">
+  <a href="https://github.com/GeiserX/Way-CMS/blob/main/LICENSE"><img src="https://img.shields.io/github/license/GeiserX/Way-CMS?style=flat-square" alt="License"></a>
+  <a href="https://hub.docker.com/r/drumsergio/way-cms"><img src="https://img.shields.io/docker/pulls/drumsergio/way-cms?style=flat-square&logo=docker&logoColor=white" alt="Docker Pulls"></a>
+</p>
+
+<p align="center"><strong>Simple, web-accessible CMS for editing HTML/CSS files downloaded from Wayback Archive with real-time preview.</strong></p>
+
+---
 
 ## Features
 
