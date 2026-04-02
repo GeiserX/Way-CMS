@@ -391,6 +391,13 @@ The database is stored at `/.way-cms-data/waycms.db` inside the container.
 - **Rate Limiting**: Default limits are 1000 requests per hour, 100 per minute
 - **Multi-Tenant Security**: Each user can only access their assigned projects; admin routes are protected with `@admin_required` decorator
 
+## Related Web Archiving Tools
+
+- [Wayback-Archive](https://github.com/GeiserX/Wayback-Archive) — Download complete websites from the Wayback Machine
+- [Website-Diff](https://github.com/GeiserX/Website-Diff) — Web page comparison with Wayback Machine support
+- [web-mirror](https://github.com/GeiserX/web-mirror) — Mirror any webpage for offline access
+- [media-download](https://github.com/GeiserX/media-download) — Download all media files from any web page
+
 ## License
 
 GPL-3.0 with commercial use restriction (see LICENSE file)
