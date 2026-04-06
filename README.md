@@ -394,7 +394,7 @@ The database is stored at `/.way-cms-data/waycms.db` inside the container.
 ## Related Web Archiving Tools
 
 - [Wayback-Archive](https://github.com/GeiserX/Wayback-Archive) — Download complete websites from the Wayback Machine
-- [Website-Diff](https://github.com/GeiserX/Website-Diff) — Web page comparison with Wayback Machine support
+- [Wayback-Diff](https://github.com/GeiserX/Wayback-Diff) — Web page comparison with Wayback Machine support
 - [web-mirror](https://github.com/GeiserX/web-mirror) — Mirror any webpage for offline access
 - [media-download](https://github.com/GeiserX/media-download) — Download all media files from any web page
 
