@@ -11,6 +11,7 @@
 <p align="center">
   <a href="https://github.com/GeiserX/Way-CMS/blob/main/LICENSE"><img src="https://img.shields.io/github/license/GeiserX/Way-CMS?style=flat-square" alt="License"></a>
   <a href="https://hub.docker.com/r/drumsergio/way-cms"><img src="https://img.shields.io/docker/pulls/drumsergio/way-cms?style=flat-square&logo=docker&logoColor=white" alt="Docker Pulls"></a>
+  <a href="https://codecov.io/gh/GeiserX/Way-CMS"><img src="https://codecov.io/gh/GeiserX/Way-CMS/graph/badge.svg" alt="codecov"></a>
 </p>
 
 <p align="center"><strong>Simple, web-accessible CMS for editing HTML/CSS files downloaded from Wayback Archive with real-time preview.</strong></p>
