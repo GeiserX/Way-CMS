@@ -399,6 +399,18 @@ The database is stored at `/.way-cms-data/waycms.db` inside the container.
 - [web-mirror](https://github.com/GeiserX/web-mirror) — Mirror any webpage for offline access
 - [media-download](https://github.com/GeiserX/media-download) — Download all media files from any web page
 
+
+## Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [Wayback-Archive](https://github.com/GeiserX/Wayback-Archive) | Download complete websites from the Wayback Machine with full asset preservation |
+| [Wayback-Diff](https://github.com/GeiserX/Wayback-Diff) | Intelligent web page comparison tool with Wayback Machine support |
+| [Website-Diff](https://github.com/GeiserX/Website-Diff) | Intelligent web page comparison tool with visual regression testing |
+| [web-mirror](https://github.com/GeiserX/web-mirror) | Mirror any webpage to a local server for offline access |
+| [media-download](https://github.com/GeiserX/media-download) | Download all media files from any web page into a folder schema |
+| [n8n-nodes-way-cms](https://github.com/GeiserX/n8n-nodes-way-cms) | n8n community node for Way-CMS archived web content management |
+
 ## License
 
 GPL-3.0 with commercial use restriction (see LICENSE file)
