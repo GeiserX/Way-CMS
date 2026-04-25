@@ -2,11 +2,9 @@
 
 import os
 import sys
-import sqlite3
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 # Add cms directory to path (also done in conftest but needed for direct imports)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'cms'))
@@ -43,7 +41,7 @@ class TestDatabase:
 
     def test_create_admin_user_updates_existing(self):
         from database import create_admin_user
-        user1 = create_admin_user('admin2@test.com', 'oldpassword')
+        create_admin_user('admin2@test.com', 'oldpassword')
         user2 = create_admin_user('admin2@test.com', 'newpassword')
         assert user2 is not None
         assert user2.check_password('newpassword')

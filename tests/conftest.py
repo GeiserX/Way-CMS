@@ -45,9 +45,16 @@ def shared_db(tmp_path, monkeypatch):
     monkeypatch.setattr('database.get_db', shared_get_db)
 
     # Also patch in models and auth since they import get_db at module level
+    import importlib
     import database
     import models
     import auth
+
+    # Reload models and auth to ensure they pick up the current database module
+    # This is needed because test files using importlib.reload(app) can cause
+    # stale references to the models/auth modules
+    importlib.reload(models)
+    importlib.reload(auth)
 
     # Patch get_db in models module (it imports from database)
     monkeypatch.setattr('models.get_db', shared_get_db)
