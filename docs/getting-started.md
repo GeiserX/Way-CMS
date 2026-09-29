@@ -20,7 +20,7 @@ Use `docker-compose.prod.yml` for production:
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-**Note:** The production compose file pins `drumsergio/way-cms:2.0.21`. Set `CMS_VERSION` in `.env` to use another tag (image tags have no `v` prefix: `2.0.21`, not `v2.0.21`).
+**Note:** The production compose file pins `drumsergio/way-cms:2.0.21`. Set `CMS_VERSION` in `.env` to use another tag (image tags have no `v` prefix: `2.0.21`, not `v2.0.21`). The image is built for `linux/amd64`; on Apple Silicon run `export DOCKER_DEFAULT_PLATFORM=linux/amd64` first.
 
 1. **Set up your website directory:**
    - Configure `WEBSITE_DIR` in your `.env` file (see [Configuration](configuration.md))
