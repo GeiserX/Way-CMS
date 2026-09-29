@@ -2,10 +2,6 @@
   <img src="https://raw.githubusercontent.com/GeiserX/Way-CMS/main/docs/images/banner.svg" alt="Way-CMS banner" width="900">
 </p>
 
-<p align="center">
-  <img src="cms/static/images/way-cms-logo.png" width="150" alt="Way-CMS">
-</p>
-
 <h1 align="center">Way-CMS</h1>
 
 <p align="center">
@@ -34,32 +30,33 @@ Way-CMS lets you edit a site downloaded with [Wayback-Archive](https://github.co
 ## Quick start
 
 ```bash
+git clone https://github.com/GeiserX/Way-CMS.git && cd Way-CMS
 cp .env.example .env   # set WEBSITE_DIR, CMS_PASSWORD and SECRET_KEY
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-The public website is on http://localhost:8080 and the CMS admin on http://localhost:5001.
+The public website is on http://localhost:8080 and the CMS admin on http://localhost:5001. The manual install and the reverse proxy setup are in [Getting started](https://github.com/GeiserX/Way-CMS/blob/main/docs/getting-started.md).
 
 ## Documentation
 
-- [Installation](https://github.com/GeiserX/Way-CMS/blob/main/docs/installation.md): Docker for development and production, manual setup, reverse proxy, troubleshooting
+- [Getting started](https://github.com/GeiserX/Way-CMS/blob/main/docs/getting-started.md): Docker for development and production, manual setup, reverse proxy
 - [Configuration](https://github.com/GeiserX/Way-CMS/blob/main/docs/configuration.md): environment variables, automatic backups, volumes, ports
 - [Usage](https://github.com/GeiserX/Way-CMS/blob/main/docs/usage.md): full feature list, basic operations, keyboard shortcuts, supported file types
 - [Multi-tenant mode](https://github.com/GeiserX/Way-CMS/blob/main/docs/multi-tenant.md): projects, users, magic links, SMTP settings, migration
 - [Security notes](https://github.com/GeiserX/Way-CMS/blob/main/docs/security-notes.md)
+- [Troubleshooting](https://github.com/GeiserX/Way-CMS/blob/main/docs/troubleshooting.md): logs, restarts, rebuilds, and what to put in a bug report
 - [Changelog](https://github.com/GeiserX/Way-CMS/blob/main/CHANGELOG.md)
 
-## Related Projects
+## Related projects
 
 | Project | Description |
 |---------|-------------|
 | [Wayback-Archive](https://github.com/GeiserX/Wayback-Archive) | Download complete websites from the Wayback Machine with full asset preservation |
 | [Wayback-Diff](https://github.com/GeiserX/Wayback-Diff) | Intelligent web page comparison tool with Wayback Machine support |
-| [Website-Diff](https://github.com/GeiserX/Website-Diff) | Intelligent web page comparison tool with visual regression testing |
 | [web-mirror](https://github.com/GeiserX/web-mirror) | Mirror any webpage to a local server for offline access |
 | [media-download](https://github.com/GeiserX/media-download) | Download all media files from any web page into a folder schema |
-| [n8n-nodes-way-cms](https://github.com/GeiserX/n8n-nodes-way-cms) | n8n community node for Way-CMS archived web content management |
+| [n8n-nodes-way-cms](https://github.com/GeiserX/n8n-nodes-way-cms) (archived) | n8n community node for Way-CMS archived web content management |
 
 ## License
 
-GPL-3.0 with commercial use restriction, see [LICENSE](https://github.com/GeiserX/Way-CMS/blob/main/LICENSE).
+[GPL-3.0-or-later](https://github.com/GeiserX/Way-CMS/blob/main/LICENSE)

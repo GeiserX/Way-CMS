@@ -1,6 +1,6 @@
-# Installation
+# Getting started
 
-## Quick Start with Docker (Recommended)
+## Docker (recommended)
 
 Way-CMS runs with **two services**: a public website (nginx) and the CMS admin interface (Flask).
 
@@ -9,7 +9,7 @@ Way-CMS runs with **two services**: a public website (nginx) and the CMS admin i
 Use `docker-compose.yml` for development:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Production Setup (Uses Docker Hub image)
@@ -17,10 +17,10 @@ docker-compose up -d
 Use `docker-compose.prod.yml` for production:
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-**Note:** The production compose file uses the pre-built image from Docker Hub (`drumsergio/way-cms:latest`). For a specific version, edit `docker-compose.prod.yml` and replace `:latest` with a version tag (e.g., `:v2.0.0` or `:v1.2.14`).
+**Note:** The production compose file pins `drumsergio/way-cms:2.0.21`. Set `CMS_VERSION` in `.env` to use another tag (image tags have no `v` prefix: `2.0.21`, not `v2.0.21`). The image is built for `linux/amd64`; on Apple Silicon run `export DOCKER_DEFAULT_PLATFORM=linux/amd64` first.
 
 1. **Set up your website directory:**
    - Configure `WEBSITE_DIR` in your `.env` file (see [Configuration](configuration.md))
@@ -44,7 +44,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 3. **Start the services:**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 4. **Access the services:**
@@ -123,28 +123,3 @@ For production deployment:
        }
    }
    ```
-
-## Troubleshooting
-
-### Check logs:
-```bash
-docker-compose logs -f cms
-docker-compose logs -f website
-```
-
-### Restart services:
-```bash
-docker-compose restart
-```
-
-### Stop services:
-```bash
-docker-compose down
-```
-
-### Rebuild after code changes:
-```bash
-docker-compose build --no-cache cms
-docker-compose up -d
-```
-

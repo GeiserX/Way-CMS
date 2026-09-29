@@ -36,7 +36,7 @@ PROJECTS_DIR=./projects
 
 2. **Start the services:**
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 3. **Access the CMS** at http://localhost:5001 and log in with your admin credentials.
