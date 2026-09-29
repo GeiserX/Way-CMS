@@ -15,10 +15,10 @@ services:
 
   # CMS admin interface - using Docker Hub image
   # Note: Set DOCKER_USERNAME env var or replace 'drumsergio' with your Docker Hub username
-  # Set CMS_VERSION env var to use a specific version (defaults to v2.0.0)
-  # Example: CMS_VERSION=v2.0.0 or CMS_VERSION=v1.2.14
+  # Set CMS_VERSION env var to use another version (defaults to 2.0.21)
+  # Image tags have no "v" prefix. Example: CMS_VERSION=2.0.20
   cms:
-    image: ${DOCKER_USERNAME:-drumsergio}/way-cms:${CMS_VERSION:-v2.0.0}
+    image: ${DOCKER_USERNAME:-drumsergio}/way-cms:${CMS_VERSION:-2.0.21}
     container_name: way-cms-admin
     ports:
       - "5001:5000"

@@ -26,7 +26,7 @@ services:
     ports:
       - "${CMS_PORT:-5001}:5000"
     # Override CMD for development - use Flask dev server
-    # In production, use: image: drumsergio/way-cms:latest (see docker-compose.prod.yml)
+    # In production, use the pinned Docker Hub image (see docker-compose.prod.yml)
     command: python app.py
     volumes:
       # Single-tenant: website files

@@ -1,6 +1,6 @@
 # Security notes
 
-How to report a vulnerability: [SECURITY.md](../SECURITY.md).
+How to report a vulnerability: [SECURITY.md](https://github.com/GeiserX/Way-CMS/blob/main/SECURITY.md).
 
 - **Default Setup**: If no password is set, the CMS uses default credentials (`admin`/`admin`). **Always change this in production!**
 - **Production Use**: Always set a strong `CMS_PASSWORD_HASH` and use HTTPS in production
