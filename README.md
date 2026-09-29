@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="Way-CMS banner" width="900">
+  <img src="https://raw.githubusercontent.com/GeiserX/Way-CMS/main/docs/images/banner.svg" alt="Way-CMS banner" width="900">
 </p>
 
 <p align="center">
