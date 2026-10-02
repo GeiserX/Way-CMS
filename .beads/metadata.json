@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "Way_CMS",
+  "project_id": "77e63fea-45a8-486c-95a0-4b64dd66b955"
+}
