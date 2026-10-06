@@ -29,14 +29,8 @@ jobs:
         pip install -r cms/requirements.txt
         pip install pytest pytest-cov
 
-    - name: Test with pytest (if tests exist)
-      run: |
-        if [ -d "tests" ] && [ "$(ls -A tests)" ]; then
-          pytest tests/ -v
-        else
-          echo "No tests found, skipping test step"
-        fi
-      continue-on-error: true
+    - name: Test with pytest
+      run: pytest tests/ -v
 
     - name: Test Flask app startup
       run: |
