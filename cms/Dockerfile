@@ -12,8 +12,9 @@ ENV CMS_BASE_DIR=/var/www/html \
 RUN mkdir -p /var/www/html /.way-cms-backups && \
     chmod 777 /var/www/html /.way-cms-backups
 
-# Install system dependencies (cache this layer)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# The base image ships ca-certificates 20250419, which still trusts the
+# compromised eMudhra intermediates; the Debian update distrusts them.
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching (dependencies change less frequently)
