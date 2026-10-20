@@ -5,6 +5,12 @@ All notable changes to Way-CMS will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.23] - 2026-10-21
+
+### Security
+
+- The image no longer trusts certificates issued through the eight eMudhra (emSign) intermediates revoked on 2026-10-18 for a key compromise: it upgrades Debian's ca-certificates to 20250419+deb13u1, which distrusts them.
+
 ## [2.0.0] - 2025-12-14
 
 ### 🎉 Major Release: Multi-Tenant Support
